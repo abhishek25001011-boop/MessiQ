@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Meal Selection", url: "/meals", icon: UtensilsCrossed },
   { title: "AI Predictions", url: "/predictions", icon: BrainCircuit },
   { title: "Admin Panel", url: "/admin", icon: ChefHat },
