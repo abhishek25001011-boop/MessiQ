@@ -1,3 +1,4 @@
+import { getSelectedMealCount } from "@/lib/storage";
 import { motion } from "framer-motion";
 import { Users, UtensilsCrossed, TrendingDown, Leaf, Sun, Moon, Coffee } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
@@ -13,8 +14,8 @@ const tomorrowMeals = [
   { time: "Lunch", icon: Sun, items: "Biryani, Raita, Gulab Jamun", timing: "12:00 – 2:00 PM" },
   { time: "Dinner", icon: Moon, items: "Chole-Bhature, Rice, Salad", timing: "7:00 – 9:00 PM" },
 ];
-
 export default function Dashboard() {
+  const selectedMeals = getSelectedMealCount();
   return (
     <div className="space-y-8 max-w-6xl">
       <div>
@@ -24,7 +25,13 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Students" value="1,248" subtitle="Opted in" icon={Users} gradient="primary" />
-        <StatCard title="Expected Meals" value="3,120" subtitle="Today" icon={UtensilsCrossed} gradient="warm" />
+        <StatCard
+  title="Selected Meals"
+  value={selectedMeals.toString()}
+  subtitle="Today's selections"
+  icon={UtensilsCrossed}
+  gradient="warm"
+/>
         <StatCard title="Waste Reduction" value="32%" subtitle="This week" icon={TrendingDown} gradient="cool" />
         <StatCard title="Food Saved" value="45 kg" subtitle="This week" icon={Leaf} gradient="primary" />
       </div>

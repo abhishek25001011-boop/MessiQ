@@ -4,8 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
+
 import LoginPage from "@/pages/LoginPage";
-import Index from "@/pages/Index";
 import Dashboard from "@/pages/Dashboard";
 import MealSelection from "@/pages/MealSelection";
 import AIPredictions from "@/pages/AIPredictions";
@@ -13,13 +13,22 @@ import AdminPanel from "@/pages/AdminPanel";
 import FeedbackPage from "@/pages/FeedbackPage";
 import WasteDashboard from "@/pages/WasteDashboard";
 import RevenuePage from "@/pages/RevenuePage";
+import ProfilePage from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const auth = localStorage.getItem("messiq-auth");
-  if (!auth) return <Navigate to="/login" replace />;
+
+  if (!auth) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -28,10 +37,20 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<LoginPage />} />
+
+          <Route
+            path="/"
+            element={<Navigate to="/login" replace />}
+          />
+
+          <Route
+            path="/login"
+            element={<LoginPage />}
+          />
+
           <Route
             element={
               <ProtectedRoute>
@@ -46,8 +65,14 @@ const App = () => (
             <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="/waste" element={<WasteDashboard />} />
             <Route path="/revenue" element={<RevenuePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
-          <Route path="*" element={<NotFound />} />
+
+          <Route
+            path="*"
+            element={<NotFound />}
+          />
+
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

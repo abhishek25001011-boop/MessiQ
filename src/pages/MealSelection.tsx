@@ -1,3 +1,4 @@
+import { saveMealSelection } from "@/lib/storage";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, Settings2, Coffee, Sun, Moon } from "lucide-react";
@@ -32,11 +33,16 @@ export default function MealSelection() {
   const updateNote = (key: string, note: string) => {
     setSelections((prev) => ({ ...prev, [key]: { ...prev[key], customNote: note } }));
   };
-
   const handleSave = () => {
-    toast.success("Meal preferences saved successfully!");
-  };
+  const today = new Date().toISOString().split("T")[0];
 
+  saveMealSelection({
+    date: today,
+    selections,
+  });
+
+  toast.success("Meal preferences saved successfully!");
+};
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
