@@ -16,7 +16,7 @@ export default function LoginPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("messiq-auth", JSON.stringify({ email, name: name || "Student" }));
-    navigate("/");
+    navigate("/dashboard");
   };
 
   return (

@@ -30,7 +30,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/welcome" element={<Index />} />
+          <Route path="/" element={<Index />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
             element={
@@ -39,7 +39,7 @@ const App = () => (
               </ProtectedRoute>
             }
           >
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/meals" element={<MealSelection />} />
             <Route path="/predictions" element={<AIPredictions />} />
             <Route path="/admin" element={<AdminPanel />} />
