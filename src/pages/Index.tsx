@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { motion, type Variants } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
@@ -552,12 +551,3 @@ export default function Index() {
     </div>
   );
 }
-=======
-export default function Index() {
-  return (
-    <div>
-      <h1>MessiQ Landing Page</h1>
-    </div>
-  );
-}
->>>>>>> 9b821fd (Completed Phase 1 of MessIQ)
