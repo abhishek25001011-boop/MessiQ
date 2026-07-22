@@ -1,3 +1,4 @@
+import Leaderboard from "@/components/Leaderboard";
 import { getSelectedMealCount } from "@/lib/storage";
 import { motion } from "framer-motion";
 import { Users, UtensilsCrossed, TrendingDown, Leaf, Sun, Moon, Coffee } from "lucide-react";
@@ -68,6 +69,7 @@ function MealCard({ title, meals }: { title: string; meals: typeof todayMeals })
             </div>
           </div>
         ))}
+        <Leaderboard />
       </div>
     </motion.div>
   );
