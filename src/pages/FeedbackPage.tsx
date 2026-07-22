@@ -104,50 +104,52 @@ export default function FeedbackPage() {
         </h2>
 
         <div className="space-y-3">
-          {feedbackList.length === 0 ? (
+                  {feedbackList.length === 0 ? (
             <div className="glass-card rounded-xl p-6 text-center text-muted-foreground">
               No feedback submitted yet.
             </div>
           ) : (
-            feedbackList
-              .slice()
-              .reverse()
-              .map((fb, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="glass-card rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">
-                      Student
-                    </span>
+            <>
+              {feedbackList
+                .slice()
+                .reverse()
+                .map((fb, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="glass-card rounded-xl p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">
+                        Student
+                      </span>
 
-                    <span className="text-xs text-muted-foreground">
-                      {fb.date}
-                    </span>
-                  </div>
+                      <span className="text-xs text-muted-foreground">
+                        {fb.date}
+                      </span>
+                    </div>
 
-                  <div className="flex gap-1 mb-2">
-                    {Array.from({ length: 5 }).map((_, s) => (
-                      <Star
-                        key={s}
-                        className={`h-4 w-4 ${
-                          s < fb.rating
-                            ? "fill-accent text-accent"
-                            : "text-muted-foreground/20"
-                        }`}
-                      />
-                    ))}
-                  </div>
+                    <div className="flex gap-1 mb-2">
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <Star
+                          key={s}
+                          className={`h-4 w-4 ${
+                            s < fb.rating
+                              ? "fill-accent text-accent"
+                              : "text-muted-foreground/20"
+                          }`}
+                        />
+                      ))}
+                    </div>
 
-                  <p className="text-sm text-muted-foreground">
-                    {fb.text}
-                  </p>
-                </motion.div>
-              ))
+                    <p className="text-sm text-muted-foreground">
+                      {fb.text}
+                    </p>
+                  </motion.div>
+                ))}
+            </>
           )}
         </div>
       </div>
