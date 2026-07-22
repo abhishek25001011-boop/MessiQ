@@ -11,6 +11,17 @@ import {
   getIngredientEstimate,
   getKitchenAlerts,
 } from "@/lib/storage";
+import { adminData } from "@/data/adminData";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  LineChart,
+  Line,
+} from "recharts";
 
 export default function AdminPanel() {
   const meals = getPredictedMeals();
@@ -120,6 +131,48 @@ export default function AdminPanel() {
         </motion.div>
 
       </div>
+      <div className="grid md:grid-cols-2 gap-6">
+
+  <div className="glass-card rounded-xl p-6">
+    <h2 className="font-display font-semibold mb-4">
+      Revenue Trend
+    </h2>
+
+    <LineChart width={350} height={200} data={adminData}>
+      <XAxis dataKey="day" />
+      <YAxis />
+      <Tooltip />
+      <Line type="monotone" dataKey="revenue" />
+    </LineChart>
+  </div>
+
+  <div className="glass-card rounded-xl p-6">
+    <h2 className="font-display font-semibold mb-4">
+      Students Served
+    </h2>
+
+    <BarChart width={350} height={200} data={adminData}>
+      <XAxis dataKey="day" />
+      <YAxis />
+      <Tooltip />
+      <Bar dataKey="students" />
+    </BarChart>
+  </div>
+
+  <div className="glass-card rounded-xl p-6">
+    <h2 className="font-display font-semibold mb-4">
+      Food Waste
+    </h2>
+
+    <BarChart width={350} height={200} data={adminData}>
+      <XAxis dataKey="day" />
+      <YAxis />
+      <Tooltip />
+      <Bar dataKey="waste" />
+    </BarChart>
+  </div>
+
+</div>
     </div>
   );
 }

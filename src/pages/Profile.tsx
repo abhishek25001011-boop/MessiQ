@@ -1,3 +1,4 @@
+import { QRCodeSVG } from "qrcode.react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -203,6 +204,14 @@ export default function ProfilePage() {
       </div>
 
       {/* Buttons */}
+      Hostel Details
+     ↓
+QR CODE SECTION   <-- Yahan paste karo
+     ↓
+<div className="flex justify-end gap-4">
+   Edit Profile
+   Save Profile
+</div>
       <div className="flex justify-end gap-4">
         <Button variant="outline">
           <Pencil className="w-4 h-4 mr-2" />
