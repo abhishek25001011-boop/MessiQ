@@ -1,3 +1,12 @@
+import { db } from "@/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "@/firebase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
+import { FirebaseError } from "firebase/app";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -13,10 +22,74 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const getAuthErrorMessage = (error: unknown) => {
+    if (!(error instanceof FirebaseError)) {
+      return "Something went wrong. Please try again.";
+    }
+
+    switch (error.code) {
+      case "auth/email-already-in-use":
+        return "This email is already registered. Please log in instead.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/weak-password":
+        return "Password should be at least 6 characters long.";
+      case "auth/user-not-found":
+      case "auth/invalid-credential":
+        return "Invalid email or password.";
+      case "auth/wrong-password":
+        return "Invalid email or password.";
+      case "auth/too-many-requests":
+        return "Too many attempts. Please wait and try again.";
+      case "auth/network-request-failed":
+        return "Network error. Check your connection and try again.";
+      default:
+        return "Authentication failed. Please try again.";
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("messiq-auth", JSON.stringify({ email, name: name || "Student" }));
-    navigate("/dashboard");
+
+    try {
+      if (isSignup) {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          name: name.trim() || "Student",
+          email: userCredential.user.email,
+          role: "student",
+          createdAt: serverTimestamp(),
+        });
+
+        localStorage.setItem(
+          "messiq-auth",
+          JSON.stringify({
+            email: userCredential.user.email,
+            name: name.trim() || "Student",
+          }),
+        );
+
+        toast.success("Account created successfully!");
+      } else {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+        localStorage.setItem(
+          "messiq-auth",
+          JSON.stringify({
+            email: userCredential.user.email,
+            name: name.trim() || "Student",
+          }),
+        );
+
+        toast.success("Logged in successfully!");
+      }
+
+      navigate("/dashboard");
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
+    }
   };
 
   return (

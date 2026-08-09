@@ -3,38 +3,93 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
-  Mail,
-  Phone,
-  GraduationCap,
-  Home,
   Save,
   Pencil,
 } from "lucide-react";
+import { auth, db } from "@/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+type ProfileData = {
+  uid: string;
+  name: string;
+  email: string;
+  role: string;
+  phone: string;
+  roll: string;
+  branch: string;
+  year: string;
+  section: string;
+  hostel: string;
+  room: string;
+  subscription: string;
+};
+
+const defaultProfile: ProfileData = {
+  uid: "",
+  name: "",
+  email: "",
+  role: "student",
+  phone: "",
+  roll: "",
+  branch: "",
+  year: "",
+  section: "",
+  hostel: "",
+  room: "",
+  subscription: "Premium",
+};
+
 export default function ProfilePage() {
-  const [profile, setProfile] = useState({
-    name: "Abhishek Kumar",
-    email: "student@college.edu",
-    phone: "9876543210",
-    roll: "2400290100001",
-    branch: "Computer Science & Engineering",
-    year: "2nd Year",
-    section: "A",
-    hostel: "H-2",
-    room: "305",
-    subscription: "Premium",
-  });
+  const [profile, setProfile] = useState<ProfileData>(defaultProfile);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("messiq-profile");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setLoadError("You must be logged in to view your profile.");
+        setIsLoading(false);
+        return;
+      }
 
-    if (saved) {
-      setProfile(JSON.parse(saved));
-    }
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+
+        if (!snap.exists()) {
+          setLoadError("Profile not found. Please contact support.");
+          setIsLoading(false);
+          return;
+        }
+
+        const data = snap.data() as Partial<ProfileData>;
+
+        setProfile({
+          ...defaultProfile,
+          ...data,
+          uid: user.uid,
+          email: data.email || user.email || "",
+          role: data.role || "student",
+        });
+      } catch (error) {
+        setLoadError("Failed to load profile. Please try again.");
+        toast.error("Failed to load profile. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   const handleChange = (
@@ -46,14 +101,61 @@ export default function ProfilePage() {
     });
   };
 
-  const handleSave = () => {
-    localStorage.setItem(
-      "messiq-profile",
-      JSON.stringify(profile)
-    );
+  const handleSave = async () => {
+    if (!profile.uid) {
+      toast.error("Unable to save profile. User not found.");
+      return;
+    }
 
-    toast.success("Profile updated successfully!");
+    try {
+      setIsSaving(true);
+
+      const userRef = doc(db, "users", profile.uid);
+      await setDoc(
+        userRef,
+        {
+          name: profile.name.trim(),
+          phone: profile.phone.trim(),
+          roll: profile.roll.trim(),
+          branch: profile.branch.trim(),
+          year: profile.year.trim(),
+          section: profile.section.trim(),
+          hostel: profile.hostel.trim(),
+          room: profile.room.trim(),
+          subscription: profile.subscription.trim(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setIsEditing(false);
+      toast.success("Profile updated successfully!");
+    } catch (error) {
+      toast.error("Failed to save profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="rounded-2xl border bg-card p-8 shadow-lg">
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="rounded-2xl border bg-card p-8 shadow-lg">
+          <p className="text-destructive">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -71,7 +173,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">
-                {profile.name}
+                {profile.name || "Student"}
               </h1>
 
               <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-sm">
@@ -80,7 +182,7 @@ export default function ProfilePage() {
             </div>
 
             <p className="text-muted-foreground mt-2">
-              {profile.branch}
+              {profile.branch || "Student Profile"}
             </p>
           </div>
         </div>
@@ -99,6 +201,7 @@ export default function ProfilePage() {
               name="name"
               value={profile.name}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -107,7 +210,16 @@ export default function ProfilePage() {
             <Input
               name="email"
               value={profile.email}
-              onChange={handleChange}
+              disabled
+            />
+          </div>
+
+          <div>
+            <label>Role</label>
+            <Input
+              name="role"
+              value={profile.role}
+              disabled
             />
           </div>
 
@@ -117,6 +229,7 @@ export default function ProfilePage() {
               name="phone"
               value={profile.phone}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -126,6 +239,7 @@ export default function ProfilePage() {
               name="subscription"
               value={profile.subscription}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
         </div>
@@ -144,6 +258,7 @@ export default function ProfilePage() {
               name="roll"
               value={profile.roll}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -153,6 +268,7 @@ export default function ProfilePage() {
               name="branch"
               value={profile.branch}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -162,6 +278,7 @@ export default function ProfilePage() {
               name="year"
               value={profile.year}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -171,6 +288,7 @@ export default function ProfilePage() {
               name="section"
               value={profile.section}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
         </div>
@@ -189,6 +307,7 @@ export default function ProfilePage() {
               name="hostel"
               value={profile.hostel}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
 
@@ -198,29 +317,25 @@ export default function ProfilePage() {
               name="room"
               value={profile.room}
               onChange={handleChange}
+              disabled={!isEditing || isSaving}
             />
           </div>
         </div>
       </div>
 
-      {/* Buttons */}
-      Hostel Details
-     ↓
-QR CODE SECTION   <-- Yahan paste karo
-     ↓
-<div className="flex justify-end gap-4">
-   Edit Profile
-   Save Profile
-</div>
       <div className="flex justify-end gap-4">
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          onClick={() => setIsEditing((prev) => !prev)}
+          disabled={isSaving}
+        >
           <Pencil className="w-4 h-4 mr-2" />
-          Edit Profile
+          {isEditing ? "Cancel" : "Edit Profile"}
         </Button>
 
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} disabled={!isEditing || isSaving}>
           <Save className="w-4 h-4 mr-2" />
-          Save Profile
+          {isSaving ? "Saving..." : "Save Profile"}
         </Button>
       </div>
     </div>

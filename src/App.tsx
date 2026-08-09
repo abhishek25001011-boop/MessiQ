@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
+import { AuthGuard } from "@/components/AuthGuard";
 
 import LoginPage from "@/pages/LoginPage";
 import Dashboard from "@/pages/Dashboard";
@@ -17,20 +18,6 @@ import ProfilePage from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
-
-function ProtectedRoute({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const auth = localStorage.getItem("messiq-auth");
-
-  if (!auth) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -48,14 +35,18 @@ const App = () => (
 
           <Route
             path="/login"
-            element={<LoginPage />}
+            element={
+              <AuthGuard requireAuth={false} redirectTo="/dashboard">
+                <LoginPage />
+              </AuthGuard>
+            }
           />
 
           <Route
             element={
-              <ProtectedRoute>
+              <AuthGuard>
                 <AppLayout />
-              </ProtectedRoute>
+              </AuthGuard>
             }
           >
             <Route path="/dashboard" element={<Dashboard />} />

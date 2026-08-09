@@ -23,6 +23,8 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { signOut } from "firebase/auth";
+import { auth } from "@/firebase";
 
 const navItems = [
   {
@@ -144,9 +146,13 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
 
         <SidebarMenuButton
-          onClick={() => {
-            localStorage.removeItem("messiq-auth");
-            window.location.href = "/login";
+          onClick={async () => {
+            try {
+              await signOut(auth);
+            } finally {
+              localStorage.removeItem("messiq-auth");
+              window.location.href = "/login";
+            }
           }}
           className="hover:bg-sidebar-accent/80"
         >
