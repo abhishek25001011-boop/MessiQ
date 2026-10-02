@@ -14,7 +14,9 @@ Campus dining teams need a clearer way to publish menus and understand expected 
 - Meal preference selection and date-wise preference history.
 - Student profile viewing and editing.
 - Meal feedback with a rating from 1 to 5 and a comment.
-- Administrator student management, meal management, and participation/feedback analytics.
+- Administrator student directory, meal management, and Firestore-backed participation/feedback analytics.
+- Meal demand insights calculated from role-accessible Firestore selection history; the demand trend is a simple statistical average, not an ML prediction.
+- Waste and revenue pages clearly report unavailable data because the current schema has no measured waste or billing records.
 - Responsive layout with light and dark themes.
 
 ## Tech stack
@@ -75,6 +77,8 @@ npm test
 ## Environment configuration
 
 The current Firebase Web SDK configuration is initialized in `src/firebase.ts`; this project does not currently read Firebase settings from environment variables. If you adapt it to use Vite environment variables, use a local `.env.local` file and the `VITE_` prefix (for example, `VITE_FIREBASE_PROJECT_ID`). Vite variables are embedded in the client bundle, so they are public configuration and must never contain private credentials. `.env` files are ignored by Git; `.env.example` may be committed for documenting variable names without values.
+
+Meal demand insights use real meal selection records. Administrators can see campus-wide selections under the existing administrator rules; students see only their own selections, as required by the existing rules. Demand averages are descriptive statistical estimates based on recorded dates, not ML output or a guarantee of future demand. The current data model does not contain served/consumed/wasted quantities or financial transactions, so the waste and revenue pages report those metrics as unavailable.
 
 ## Deployment
 

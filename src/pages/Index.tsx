@@ -25,11 +25,11 @@ const fadeUp: Variants = {
 };
 
 const features = [
-  { icon: Brain, title: "AI Predictions", desc: "Forecast meal demand with 96%+ accuracy using historical patterns." },
-  { icon: Recycle, title: "Waste Reduction", desc: "Cut food waste by up to 32% with smart portion planning." },
-  { icon: IndianRupee, title: "Revenue Insights", desc: "Track subscriptions, tie-ups, and vendor commissions in real time." },
-  { icon: MessageSquare, title: "Student Feedback", desc: "Sentiment-analyzed reviews turned into actionable menu changes." },
-  { icon: BarChart3, title: "Live Analytics", desc: "Beautiful dashboards for every stakeholder — student to admin." },
+  { icon: Brain, title: "Meal Demand Insights", desc: "Review historical meal selections and a simple average trend. No ML prediction model is connected." },
+  { icon: Recycle, title: "Waste Tracking", desc: "Meal selections provide demand context; measured waste needs served and leftover quantities." },
+  { icon: IndianRupee, title: "Revenue Tracking", desc: "Revenue analytics require payment or billing records, which are not configured." },
+  { icon: MessageSquare, title: "Student Feedback", desc: "Collect meal ratings and comments for review by the mess team." },
+  { icon: BarChart3, title: "Firestore Analytics", desc: "Role-scoped dashboards for meal selections, students, menus, and feedback." },
   { icon: ShieldCheck, title: "Role-based Access", desc: "Secure admin controls with granular permissions." },
 ];
 
@@ -64,9 +64,9 @@ function DashboardMockup() {
       </div>
       <div className="p-5 md:p-7 grid grid-cols-6 gap-4">
         {[
-          { label: "Meals Today", val: "1,085", tint: "from-emerald-400 to-teal-400" },
-          { label: "Accuracy", val: "96.2%", tint: "from-sky-400 to-indigo-400" },
-          { label: "Waste ↓", val: "32%", tint: "from-amber-400 to-orange-400" },
+          { label: "Menus", val: "Firestore", tint: "from-emerald-400 to-teal-400" },
+          { label: "Meal choices", val: "Role-scoped", tint: "from-sky-400 to-indigo-400" },
+          { label: "Analytics", val: "Historical", tint: "from-amber-400 to-orange-400" },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -85,47 +85,19 @@ function DashboardMockup() {
 
         <div className="col-span-6 md:col-span-4 rounded-xl p-4 bg-white/[0.04] border border-white/10">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm text-white/70">Predicted vs Actual</div>
-            <div className="text-[11px] text-white/40">Last 7 days</div>
+            <div className="text-sm text-white/70">Available meal insights</div>
+            <div className="text-[11px] text-white/40">After sign-in</div>
           </div>
-          <div className="h-32 flex items-end gap-2">
-            {[40, 62, 48, 78, 90, 55, 50].map((h, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 0 }}
-                whileInView={{ height: `${h}%` }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.05 * i, duration: 0.6, ease: "easeOut" }}
-                className="flex-1 rounded-md bg-gradient-to-t from-emerald-500/70 to-emerald-300/80"
-              />
-            ))}
+          <div className="grid h-32 grid-cols-1 content-center gap-3 text-sm text-white/60">
+            <p>Demand trends use saved meal selections.</p>
+            <p>Students see their own history; admins can review campus selections.</p>
+            <p>No real-time demo figures are shown here.</p>
           </div>
         </div>
 
         <div className="col-span-6 md:col-span-2 rounded-xl p-4 bg-white/[0.04] border border-white/10">
-          <div className="text-sm text-white/70 mb-3">High demand</div>
-          {[
-            ["Paneer Butter Masala", 92],
-            ["Chicken Biryani", 88],
-            ["Chole Bhature", 85],
-            ["Gulab Jamun", 80],
-          ].map(([label, v], i) => (
-            <div key={i} className="mb-2 last:mb-0">
-              <div className="flex justify-between text-[11px] text-white/60 mb-1">
-                <span className="truncate">{label as string}</span>
-                <span>{v as number}%</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${v as number}%` }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.1 * i, duration: 0.7 }}
-                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-300"
-                />
-              </div>
-            </div>
-          ))}
+          <div className="text-sm text-white/70 mb-3">Data limits</div>
+          <p className="text-xs leading-relaxed text-white/50">Waste quantities and revenue are unavailable until service measurements and billing data are recorded.</p>
         </div>
       </div>
     </div>
@@ -200,7 +172,7 @@ export default function Index() {
             transition={{ delay: 0.1 }}
             className="mt-6 max-w-2xl mx-auto text-lg text-white/60"
           >
-            Predict meals. Reduce waste. Delight students. MessIQ brings the intelligence of Apple-grade design
+            Coordinate meals. Understand selections. Support mess teams. MessIQ brings clear dining workflows
             to the messiest problem on campus.
           </motion.p>
 
@@ -274,47 +246,34 @@ export default function Index() {
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium text-sky-300/90 bg-sky-400/10 border border-sky-400/20">
-              <Brain className="h-3.5 w-3.5" /> AI Predictions
+              <Brain className="h-3.5 w-3.5" /> Meal Demand Insights
             </span>
             <h2 className="mt-4 text-3xl md:text-5xl font-display font-semibold tracking-tight leading-tight">
-              Forecasts so accurate,
+              Understand demand,
               <br />
               <span className="bg-gradient-to-r from-sky-300 to-indigo-300 bg-clip-text text-transparent">
-                you'll trust the kitchen again.
+                from recorded choices.
               </span>
             </h2>
             <p className="mt-5 text-white/60 text-lg">
-              MessIQ studies weekly patterns, menu popularity, weather, and holidays to predict tomorrow's demand —
-              down to the dish.
+              Review historical meal choices and a simple average demand trend calculated from saved selections. No machine-learning model or prediction pipeline is connected.
             </p>
-            <div className="mt-8 grid grid-cols-3 gap-4">
-              {[["96.2%", "Accuracy"], ["7d", "Rolling window"], ["+18%", "Efficiency"]].map(([v, l]) => (
-                <div key={l} className="rounded-xl p-4 bg-white/[0.04] border border-white/10">
-                  <div className="text-2xl font-display font-semibold">{v}</div>
-                  <div className="text-xs text-white/50 mt-1">{l}</div>
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[["Real data", "Firestore meal selections"], ["Trend", "Historical average"], ["Model", "Not connected"]].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/40">{label}</div>
+                  <div className="mt-1 text-sm font-medium text-white/80">{value}</div>
                 </div>
               ))}
             </div>
           </motion.div>
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6">
-              <div className="text-xs text-white/40 mb-4">Demand curve · this week</div>
-              <div className="h-48 flex items-end gap-2">
-                {[30, 45, 38, 62, 88, 74, 50].map((h, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ height: 0 }}
-                    whileInView={{ height: `${h}%` }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.05 * i, duration: 0.7 }}
-                    className="flex-1 rounded-md bg-gradient-to-t from-sky-500/70 to-indigo-300/80"
-                  />
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-7 text-[10px] text-white/40 text-center">
-                {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                  <span key={i}>{d}</span>
-                ))}
+              <div className="text-xs text-white/40 mb-4">Meal demand data</div>
+              <div className="flex min-h-48 flex-col justify-center gap-4 text-sm text-white/60">
+                <p>Historical selection totals and meal-type breakdowns are available after sign-in.</p>
+                <p>A trend estimate appears only when enough distinct dates have recorded choices.</p>
+                <p>Students see personal records. Campus-wide data is reserved for administrators.</p>
               </div>
             </div>
           </motion.div>
@@ -325,38 +284,13 @@ export default function Index() {
       <section id="revenue" className="relative py-24 md:py-32 px-6">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center">
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="order-2 md:order-1">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <div className="text-xs text-white/40">Monthly Revenue</div>
-                  <div className="mt-1 text-4xl font-display font-semibold bg-gradient-to-r from-amber-300 to-orange-300 bg-clip-text text-transparent">
-                    ₹4,10,400
-                  </div>
+            <div className="flex min-h-64 flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+              <div className="mx-auto max-w-sm text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.06] text-amber-300">
+                  <IndianRupee className="h-6 w-6" aria-hidden="true" />
                 </div>
-                <div className="text-xs px-2 py-1 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/20">+18%</div>
-              </div>
-              <div className="mt-6 space-y-3">
-                {[
-                  ["Subscriptions", 62],
-                  ["College Tie-ups", 28],
-                  ["Vendor Commission", 10],
-                ].map(([label, v], i) => (
-                  <div key={i}>
-                    <div className="flex justify-between text-xs text-white/60 mb-1">
-                      <span>{label as string}</span>
-                      <span>{v as number}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        whileInView={{ width: `${v as number}%` }}
-                        viewport={{ once: true }}
-                        transition={{ delay: i * 0.1, duration: 0.7 }}
-                        className="h-full bg-gradient-to-r from-amber-400 to-orange-300"
-                      />
-                    </div>
-                  </div>
-                ))}
+                <h3 className="mt-4 font-display text-xl font-semibold">Revenue tracking not configured</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/50">This project has no payment, billing, or transaction records. Revenue analytics require actual financial data.</p>
               </div>
             </div>
           </motion.div>
@@ -372,8 +306,7 @@ export default function Index() {
               </span>
             </h2>
             <p className="mt-5 text-white/60 text-lg">
-              Three revenue streams, one dashboard. Compare subscriptions, college contracts, and vendor commissions
-              side by side.
+              Revenue analytics will be available when a secure billing or transaction data source is added.
             </p>
           </motion.div>
         </div>
@@ -394,46 +327,17 @@ export default function Index() {
               </span>
             </h2>
             <p className="mt-5 text-white/60 text-lg">
-              Portioning powered by prediction. Watch your daily food waste drop while sustainability metrics climb.
+              Meal selections show intended demand. Actual waste reporting needs recorded meal quantities served and left over; those measurements are not currently available.
             </p>
           </motion.div>
           <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 flex items-center gap-6">
-              <div className="relative w-40 h-40 shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="42" stroke="hsl(0 0% 100% / 0.1)" strokeWidth="10" fill="none" />
-                  <motion.circle
-                    cx="50" cy="50" r="42"
-                    stroke="url(#g1)" strokeWidth="10" fill="none" strokeLinecap="round"
-                    strokeDasharray={2 * Math.PI * 42}
-                    initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
-                    whileInView={{ strokeDashoffset: 2 * Math.PI * 42 * (1 - 0.32) }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1.2, ease: "easeOut" }}
-                  />
-                  <defs>
-                    <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#34d399" />
-                      <stop offset="100%" stopColor="#14b8a6" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-3xl font-display font-semibold">32%</div>
-                  <div className="text-[11px] text-white/50">less waste</div>
+            <div className="flex min-h-64 items-center rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+              <div className="mx-auto max-w-sm text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.06] text-emerald-300">
+                  <Recycle className="h-6 w-6" aria-hidden="true" />
                 </div>
-              </div>
-              <div className="space-y-3 flex-1">
-                {[
-                  ["Weekly reduction", "45 kg"],
-                  ["Today", "12 kg"],
-                  ["Target", "< 15 kg"],
-                ].map(([l, v]) => (
-                  <div key={l} className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">{l}</span>
-                    <span className="font-medium">{v}</span>
-                  </div>
-                ))}
+                <h3 className="mt-4 font-display text-xl font-semibold">Waste measurements unavailable</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/50">Firestore stores meal choices, not prepared, served, consumed, or discarded quantities. No waste totals or reduction percentages are shown.</p>
               </div>
             </div>
           </motion.div>
@@ -446,7 +350,7 @@ export default function Index() {
           <SectionHeading
             eyebrow="Student Feedback"
             title="Voices from the mess hall"
-            sub="Real-time sentiment, distilled into decisions."
+            sub="Meal ratings and comments submitted by students."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[

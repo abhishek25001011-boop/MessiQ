@@ -18,56 +18,28 @@ export function AuthGuard({
 }: AuthGuardProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [redirectAuthenticatedUser, setRedirectAuthenticatedUser] = useState(false);
 
   useEffect(() => {
-    let unsubscribeProfile: (() => void) | undefined;
+    let isInitialAuthState = true;
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => {
-        unsubscribeProfile?.();
-        unsubscribeProfile = undefined;
-
-        if (!firebaseUser) {
-          setUser(null);
-          setIsLoading(false);
-          return;
+        if (isInitialAuthState) {
+          isInitialAuthState = false;
+          setRedirectAuthenticatedUser(Boolean(firebaseUser));
         }
-
-        setIsLoading(true);
-        unsubscribeProfile = onSnapshot(
-          doc(db, "users", firebaseUser.uid),
-          (profileSnapshot) => {
-            if (auth.currentUser?.uid !== firebaseUser.uid) return;
-            if (!profileSnapshot.exists()) {
-              setUser(null);
-              setIsLoading(false);
-              return;
-            }
-
-            setUser(firebaseUser);
-            setIsLoading(false);
-          },
-          (error) => {
-            if (auth.currentUser?.uid !== firebaseUser.uid) return;
-            console.error("Failed to load the authenticated user's profile:", error);
-            setUser(null);
-            setIsLoading(false);
-            toast.error("Unable to load your account profile. Please try again.");
-          },
-        );
+        setUser(firebaseUser);
+        setIsLoading(false);
       },
       (error) => {
-        unsubscribeProfile?.();
-        unsubscribeProfile = undefined;
         console.error("Failed to resolve Firebase authentication state:", error);
         setUser(null);
         setIsLoading(false);
-        toast.error("Unable to verify your sign-in. Please log in again.");
       },
     );
 
     return () => {
-      unsubscribeProfile?.();
       unsubscribe();
     };
   }, []);
@@ -80,7 +52,7 @@ export function AuthGuard({
     return <Navigate to="/login" replace />;
   }
 
-  if (!requireAuth && user) {
+  if (!requireAuth && user && redirectAuthenticatedUser) {
     return <Navigate to={redirectTo ?? "/dashboard"} replace />;
   }
 
@@ -105,7 +77,8 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         doc(db, "users", user.uid),
         (userSnapshot) => {
           if (auth.currentUser?.uid !== user.uid) return;
-          setAccess(userSnapshot.exists() && userSnapshot.data().role === "admin" ? "admin" : "denied");
+          const role = userSnapshot.exists() ? userSnapshot.data().role : undefined;
+          setAccess(role === "admin" ? "admin" : "denied");
         },
         (error) => {
           console.error("Failed to verify admin role:", error);

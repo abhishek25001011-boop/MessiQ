@@ -23,8 +23,10 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { signOut } from "firebase/auth";
-import { auth } from "@/firebase";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const navItems = [
@@ -72,8 +74,30 @@ const navItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let unsubscribeProfile: (() => void) | undefined;
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeProfile?.();
+      unsubscribeProfile = undefined;
+      setIsAdmin(false);
+      if (user) {
+        unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (profile) => {
+          if (auth.currentUser?.uid === user.uid) {
+            setIsAdmin(profile.exists() && profile.data().role === "admin");
+          }
+        }, (error) => console.error("Failed to load navigation role:", error));
+      }
+    });
+    return () => {
+      unsubscribeProfile?.();
+      unsubscribeAuth();
+    };
+  }, []);
 
   const collapsed = state === "collapsed";
+  const visibleNavItems = navItems.filter((item) => item.url !== "/admin" || isAdmin);
 
   return (
     <Sidebar collapsible="icon">
@@ -111,7 +135,7 @@ export function AppSidebar() {
 
             <SidebarMenu>
 
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
 
                 <SidebarMenuItem key={item.title}>
 
@@ -150,7 +174,6 @@ export function AppSidebar() {
           onClick={async () => {
             try {
               await signOut(auth);
-              localStorage.removeItem("messiq-auth");
               window.location.href = "/login";
             } catch (error) {
               console.error("Failed to sign out:", error);

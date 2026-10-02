@@ -63,6 +63,11 @@ interface AdminMetrics {
   mealParticipationPercentage: number;
   feedbackCount: number;
   mealCounts: Record<MealType, number>;
+  selectionCounts: {
+    yes: number;
+    custom: number;
+    skipped: number;
+  };
 }
 
 type MealType = "breakfast" | "lunch" | "snacks" | "dinner";
@@ -109,6 +114,11 @@ const initialMetrics: AdminMetrics = {
     lunch: 0,
     snacks: 0,
     dinner: 0,
+  },
+  selectionCounts: {
+    yes: 0,
+    custom: 0,
+    skipped: 0,
   },
 };
 
@@ -202,18 +212,26 @@ export default function AdminPanel() {
           snacks: 0,
           dinner: 0,
         };
+        const selectionCounts: AdminMetrics["selectionCounts"] = {
+          yes: 0,
+          custom: 0,
+          skipped: 0,
+        };
 
         selectionsSnap.forEach((docSnap) => {
-          const uid = String(docSnap.data().uid || "");
-          const mealType = String(docSnap.data().mealType || "").toLowerCase() as MealType;
+          const data = docSnap.data();
+          const uid = String(data.uid || "");
+          const mealType = String(data.mealType || "").toLowerCase() as MealType;
+          const choice = data.choice;
           if (!uid || !studentUids.has(uid) || !mealTypeOptions.includes(mealType)) return;
+          if (choice !== "yes" && choice !== "custom" && choice !== "no") return;
 
           todaysMealSelections += 1;
-          if (uid) {
-            uniqueParticipants.add(uid);
-          }
-
+          uniqueParticipants.add(uid);
           mealCounts[mealType] += 1;
+          if (choice === "yes") selectionCounts.yes += 1;
+          else if (choice === "custom") selectionCounts.custom += 1;
+          else selectionCounts.skipped += 1;
         });
 
         const studentRows: StudentRecord[] = [];
@@ -279,6 +297,7 @@ export default function AdminPanel() {
           mealParticipationPercentage,
           feedbackCount: feedbackSnap.size,
           mealCounts,
+          selectionCounts,
         });
         setStudents(studentRows);
         setMeals(mealRows);
@@ -507,6 +526,27 @@ export default function AdminPanel() {
                     <span className="font-medium">{metrics.mealCounts[type]}</span>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-6 border-t pt-5">
+                <h3 className="mb-3 text-sm font-semibold">Selection Type</h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border bg-card/70 p-3">
+                    <p className="text-sm text-muted-foreground">Yes, I’ll Eat</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">{metrics.selectionCounts.yes}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card/70 p-3">
+                    <p className="text-sm text-muted-foreground">Custom Meals</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">{metrics.selectionCounts.custom}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card/70 p-3">
+                    <p className="text-sm text-muted-foreground">Skipped</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">{metrics.selectionCounts.skipped}</p>
+                  </div>
+                </div>
+                {metrics.todaysMealSelections === 0 && (
+                  <p className="mt-3 text-sm text-muted-foreground">No meal selections recorded today.</p>
+                )}
               </div>
             </motion.div>
 

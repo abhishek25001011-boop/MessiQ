@@ -29,6 +29,13 @@ interface FeedbackRecord {
 interface MealSelectionRecord {
   mealType: string;
   mealId: string;
+  choice: string;
+}
+
+interface MealRecord {
+  id: string;
+  type: string;
+  name: string;
 }
 
 function getCurrentMealType(): string {
@@ -57,18 +64,21 @@ export default function FeedbackPage() {
   const [uid, setUid] = useState<string | null>(null);
   const [isStudent, setIsStudent] = useState<boolean | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
-  const [currentMealId, setCurrentMealId] = useState<string | null>(null);
+  const [todayMeals, setTodayMeals] = useState<MealRecord[]>([]);
+  const [selectedMealId, setSelectedMealId] = useState("");
   const [isMealLoading, setIsMealLoading] = useState(true);
   const [mealError, setMealError] = useState<string | null>(null);
   const [feedbackList, setFeedbackList] = useState<FeedbackRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const today = getLocalDateString();
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUid(user?.uid ?? null);
-      setCurrentMealId(null);
+      setTodayMeals([]);
+      setSelectedMealId("");
       setIsMealLoading(Boolean(user));
       setMealError(null);
 
@@ -148,49 +158,89 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     if (!uid || isStudent !== true) {
+      setTodayMeals([]);
+      setSelectedMealId("");
       setIsMealLoading(false);
       return;
     }
 
+    let active = true;
     const resolveCurrentMealId = async () => {
       setIsMealLoading(true);
       setMealError(null);
-      const today = getLocalDateString();
+      setTodayMeals([]);
+      setSelectedMealId("");
 
       try {
-        const selectionQuery = query(
-          collection(db, "mealSelections"),
-          where("uid", "==", uid),
+        const mealsQuery = query(
+          collection(db, "meals"),
           where("date", "==", today),
         );
+        const mealsSnapshot = await getDocs(mealsQuery);
+        if (!active || auth.currentUser?.uid !== uid) return;
 
-        const snapshot = await getDocs(selectionQuery);
-        const selections: MealSelectionRecord[] = [];
-
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          selections.push({
-            mealType: String(data.mealType || ""),
-            mealId: data.choice === "no" ? "" : String(data.mealId || ""),
-          });
+        const meals: MealRecord[] = [];
+        mealsSnapshot.forEach((mealDoc) => {
+          const data = mealDoc.data();
+          const type = String(data.type || "").toLowerCase();
+          const name = String(data.name || "").trim();
+          if (["breakfast", "lunch", "snacks", "dinner"].includes(type) && name) {
+            meals.push({ id: mealDoc.id, type, name });
+          }
         });
+        setTodayMeals(meals);
+
+        if (!meals.length) {
+          setSelectedMealId("");
+          return;
+        }
+
+        const selections: MealSelectionRecord[] = [];
+        try {
+          const selectionQuery = query(
+            collection(db, "mealSelections"),
+            where("uid", "==", uid),
+            where("date", "==", today),
+          );
+          const snapshot = await getDocs(selectionQuery);
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            selections.push({
+              mealType: String(data.mealType || ""),
+              mealId: String(data.mealId || ""),
+              choice: String(data.choice || ""),
+            });
+          });
+        } catch (error) {
+          console.error("Failed to load saved meal choice for feedback:", error);
+        }
+        if (!active || auth.currentUser?.uid !== uid) return;
 
         const preferredType = getCurrentMealType();
-        const preferred = selections.find((s) => s.mealType === preferredType && s.mealId);
-        const fallback = selections.find((s) => s.mealId);
+        const mealIds = new Set(meals.map((meal) => meal.id));
+        const preferred = selections.find((selection) =>
+          selection.mealType === preferredType &&
+          selection.choice !== "no" &&
+          mealIds.has(selection.mealId),
+        );
+        const fallback = selections.find((selection) =>
+          selection.choice !== "no" && mealIds.has(selection.mealId),
+        );
 
-        setCurrentMealId(preferred?.mealId || fallback?.mealId || null);
+        setSelectedMealId(preferred?.mealId || fallback?.mealId || (meals.length === 1 ? meals[0].id : ""));
       } catch (error) {
         console.error("Failed to resolve today's meal for feedback:", error);
-        setMealError("Unable to load today's meal. Please try again later.");
-        setCurrentMealId(null);
+        if (active) setMealError("Unable to load today's meal. Please try again later.");
       } finally {
-        setIsMealLoading(false);
+        if (active) setIsMealLoading(false);
       }
     };
 
     resolveCurrentMealId();
-  }, [uid, isStudent]);
+    return () => {
+      active = false;
+    };
+  }, [uid, isStudent, today]);
 
   const handleSubmit = async () => {
     const userId = auth.currentUser?.uid;
@@ -209,15 +259,15 @@ export default function FeedbackPage() {
       return;
     }
 
-    if (!currentMealId) {
-      toast.error("No selected meal found for today.");
+    if (!selectedMealId) {
+      toast.error("Please select today's meal before submitting feedback.");
       return;
     }
 
     try {
       setIsSubmitting(true);
 
-      const feedbackId = getFeedbackDocId(userId, currentMealId);
+      const feedbackId = getFeedbackDocId(userId, selectedMealId);
       const feedbackRef = doc(db, "feedback", feedbackId);
       await runTransaction(db, async (transaction) => {
         const existingFeedback = await transaction.get(feedbackRef);
@@ -225,7 +275,7 @@ export default function FeedbackPage() {
 
         transaction.set(feedbackRef, {
           uid: userId,
-          mealId: currentMealId,
+          mealId: selectedMealId,
           rating,
           comment: comment.trim(),
           createdAt: serverTimestamp(),
@@ -274,8 +324,36 @@ export default function FeedbackPage() {
         {accessError && <p className="mb-4 text-sm text-destructive">{accessError}</p>}
         {isMealLoading && <p className="mb-4 text-sm text-muted-foreground">Finding your meal...</p>}
         {!isMealLoading && mealError && <p className="mb-4 text-sm text-destructive">{mealError}</p>}
-        {!isMealLoading && !mealError && isStudent && !currentMealId && (
-          <p className="mb-4 text-sm text-muted-foreground">No meal is available to rate today.</p>
+        {!isMealLoading && !mealError && isStudent && todayMeals.length === 0 && (
+          <p className="mb-4 text-sm text-muted-foreground" aria-live="polite">No meal is available to rate today.</p>
+        )}
+
+        {!isMealLoading && !mealError && todayMeals.length > 1 && (
+          <div className="mb-4 space-y-2">
+            <label htmlFor="feedback-meal" className="text-sm font-medium">Meal to rate</label>
+            <select
+              id="feedback-meal"
+              value={selectedMealId}
+              onChange={(event) => {
+                setSelectedMealId(event.target.value);
+                setRating(0);
+                setComment("");
+              }}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting || isStudent !== true}
+            >
+              <option value="">Choose a meal to rate</option>
+              {todayMeals.map((meal) => (
+                <option key={meal.id} value={meal.id}>
+                  {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)} — {meal.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {!isMealLoading && !mealError && todayMeals.length === 1 && (
+          <p className="mb-4 text-sm text-muted-foreground">Meal to rate: <span className="font-medium text-foreground">{todayMeals[0].name}</span></p>
         )}
 
         <div className="flex gap-1 mb-4">
@@ -283,11 +361,13 @@ export default function FeedbackPage() {
             <button
               key={star}
               type="button"
+              aria-label={`Rate ${star} out of 5`}
+              aria-pressed={rating === star}
               onClick={() => setRating(star)}
               onMouseEnter={() => setHover(star)}
               onMouseLeave={() => setHover(0)}
               className="transition-transform hover:scale-110"
-              disabled={isSubmitting || isStudent !== true || isMealLoading}
+              disabled={isSubmitting || isStudent !== true || isMealLoading || !selectedMealId}
             >
               <Star
                 className={`h-8 w-8 ${
@@ -301,17 +381,18 @@ export default function FeedbackPage() {
         </div>
 
         <Textarea
+          aria-label="Feedback comment"
           placeholder="Share your thoughts about today's food..."
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           className="mb-4"
-          disabled={isSubmitting || isStudent !== true || isMealLoading}
+          disabled={isSubmitting || isStudent !== true || isMealLoading || !selectedMealId}
         />
 
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting || isStudent !== true || isMealLoading || !currentMealId}
+          disabled={isSubmitting || isStudent !== true || isMealLoading || !selectedMealId || !rating || !comment.trim()}
           className="gradient-primary text-primary-foreground hover:opacity-90"
         >
           <Send className="h-4 w-4 mr-2" />

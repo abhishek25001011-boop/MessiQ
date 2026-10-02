@@ -32,7 +32,7 @@ const defaultProfile: ProfileData = {
   uid: "",
   name: "",
   email: "",
-  role: "student",
+  role: "Unknown",
   phone: "",
   roll: "",
   branch: "",
@@ -79,7 +79,7 @@ export default function ProfilePage() {
           ...data,
           uid: user.uid,
           email: data.email || user.email || "",
-          role: data.role || "student",
+          role: data.role === "student" || data.role === "admin" ? data.role : "Unknown",
         };
         setProfile(loadedProfile);
         setSavedProfile(loadedProfile);

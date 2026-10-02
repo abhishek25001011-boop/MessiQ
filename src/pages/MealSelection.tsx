@@ -337,8 +337,9 @@ export default function MealSelection() {
       </div>
 
       <div className="glass-card rounded-xl p-4">
-        <label className="text-sm text-muted-foreground">Select Date</label>
+        <label htmlFor="meal-date" className="text-sm text-muted-foreground">Select Date</label>
         <Input
+          id="meal-date"
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
