@@ -1,200 +1,99 @@
-# 🍽️ MessIQ – Smart Mess Management System
+# MessIQ
 
-MessIQ is an AI-powered Smart Mess Management System developed to simplify hostel meal management, reduce food wastage, and improve the dining experience for students and mess administrators. The platform enables secure authentication, smart meal selection, real-time analytics, waste monitoring, and AI-driven meal demand prediction.
+MessIQ is a web application for coordinating campus dining. It gives students a place to view meal menus, record meal preferences, review their history, manage their profile, and leave meal feedback. Administrators can manage menus and review student and meal activity.
 
----
+## Problem
 
-# 🚀 Features
+Campus dining teams need a clearer way to publish menus and understand expected participation. Students need a convenient way to see what is being served and communicate their meal choices. MessIQ brings these workflows together in one role-aware application.
 
-- 🔐 Secure User Authentication using Firebase
-- 👤 Student Dashboard
-- 🛠️ Admin Dashboard
-- 🍛 Smart Meal Selection System
-- 📊 Real-Time Analytics Dashboard
-- ♻️ Food Waste Monitoring
-- 💬 Feedback Management System
-- 🤖 AI-Based Meal Demand Prediction
-- 📈 Revenue Analytics Dashboard
-- 🌙 Dark & Light Theme Support
-- 📱 Fully Responsive User Interface
+## Features
 
----
+- Email and password sign-in and account registration with Firebase Authentication.
+- Student and administrator experiences protected by authentication and role checks.
+- Date-based breakfast, lunch, snacks, and dinner menus.
+- Meal preference selection and date-wise preference history.
+- Student profile viewing and editing.
+- Meal feedback with a rating from 1 to 5 and a comment.
+- Administrator student management, meal management, and participation/feedback analytics.
+- Responsive layout with light and dark themes.
 
-# 🛠️ Tech Stack
+## Tech stack
 
-### Frontend
-- React.js
-- TypeScript
-- Vite
-- Tailwind CSS
-- Shadcn UI
-- React Router DOM
-- Framer Motion
-- Lucide React
+- React 18, TypeScript, and Vite
+- React Router
+- Firebase Authentication and Cloud Firestore
+- Tailwind CSS, shadcn/ui, Radix UI, and Lucide icons
+- Recharts for dashboard visualizations
 
-### Backend
-- Firebase Authentication
-- Firebase Firestore
+## Firebase and Firestore architecture
 
-### Tools
-- Git
-- GitHub
-- VS Code
+The application uses the Firebase Web SDK initialized once in `src/firebase.ts`. Authentication is provided by Firebase Authentication; Firestore reads and writes use the shared `db` instance exported from that module.
 
----
+The current Firestore data model uses:
 
-# 📂 Project Structure
+| Collection | Purpose |
+| --- | --- |
+| `users/{uid}` | Student or administrator profile keyed by Firebase Authentication UID. The `role` field controls access. |
+| `meals/{mealId}` | Menu entries with `date`, `type`, `name`, `description`, and `createdAt`. |
+| `mealSelections/{preferenceId}` | A student's meal choices, keyed to avoid duplicate user/date/meal-type entries. |
+| `feedback/{feedbackId}` | Meal ratings and comments associated with a student UID and meal ID. |
 
-```text
-MessIQ/
-│
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── hooks/
-│   ├── lib/
-│   ├── firebase.ts
-│   ├── App.tsx
-│   └── main.tsx
-│
-├── public/
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-└── README.md
+Firestore access is governed by [`firestore.rules`](firestore.rules). The rules restrict student records to their owner and allow administrator operations according to the user's Firestore role. Configure and review the rules for your own Firebase project before making it publicly accessible. A Firebase web API key is included in the browser app configuration; it identifies the Firebase project and is not a server credential. Never put service account keys, private keys, or other server credentials in this frontend repository. Use Firebase Authentication, Firestore Security Rules, and appropriate Firebase API restrictions to protect project data.
+
+## Requirements
+
+- Node.js 20 or later and npm
+- A Firebase project with Email/Password Authentication and Cloud Firestore enabled
+- An administrator account whose `users/{uid}.role` is set to `admin` using a trusted administrative process
+
+## Local setup
+
+1. Clone the repository and open its directory.
+2. Install dependencies:
+
+   ```sh
+   npm ci
+   ```
+
+3. Configure the Firebase project used by the application in `src/firebase.ts` (Firebase web app configuration only).
+4. Start the development server:
+
+   ```sh
+   npm run dev
+   ```
+
+5. Open the local URL printed by Vite.
+
+Useful checks:
+
+```sh
+npm run build
+npm run lint
+npm test
 ```
 
----
+## Environment configuration
 
-# 🔐 Authentication
+The current Firebase Web SDK configuration is initialized in `src/firebase.ts`; this project does not currently read Firebase settings from environment variables. If you adapt it to use Vite environment variables, use a local `.env.local` file and the `VITE_` prefix (for example, `VITE_FIREBASE_PROJECT_ID`). Vite variables are embedded in the client bundle, so they are public configuration and must never contain private credentials. `.env` files are ignored by Git; `.env.example` may be committed for documenting variable names without values.
 
-MessIQ uses Firebase Authentication to provide secure login and signup functionality.
+## Deployment
 
-Features include:
+The project is configured for Firebase Hosting. After setting up a Firebase project and selecting it for the Firebase CLI, deploy the production build:
 
-- Email & Password Authentication
-- Secure Login
-- Secure Signup
-- Protected Routes
-- Persistent User Sessions
-
----
-
-# 📊 Modules
-
-### 👤 Student Module
-
-- Login & Signup
-- Dashboard
-- Meal Selection
-- View Meal History
-- Submit Feedback
-- Profile Management
-
----
-
-### 🛠️ Admin Module
-
-- Dashboard
-- View Registered Students
-- Monitor Meal Selections
-- Food Waste Analytics
-- Revenue Dashboard
-- Feedback Management
-
----
-
-# 🤖 AI Features
-
-- Meal Demand Prediction
-- Food Waste Prediction
-- Smart Analytics
-- Future Recommendation System
-
----
-
-# 📈 Dashboard Features
-
-- Total Students
-- Today's Meal Count
-- Food Waste Statistics
-- Revenue Analytics
-- Weekly Reports
-- AI Insights
-
----
-
-# 🚀 Future Enhancements
-
-- QR Code Meal Verification
-- Push Notifications
-- Inventory Management
-- Attendance Integration
-- Monthly Reports
-- Multi-Mess Support
-- Cloud Backup
-- AI Recommendation Engine
-
----
-
-# ⚙️ Installation
-
-Clone the repository
-
-```bash
-git clone https://github.com/your-username/MessIQ.git
+```sh
+npm ci
+npm run build
+npx firebase-tools login
+npx firebase-tools use --add
+npx firebase-tools deploy --only hosting,firestore:rules
 ```
 
-Go to project directory
+The Hosting configuration serves Vite's `dist` directory and rewrites application routes to `index.html`. Confirm the selected Firebase project, Authentication providers, Firestore rules, and administrator role before deployment. This repository preparation does not deploy the application.
 
-```bash
-cd MessIQ
-```
+For a different static hosting provider, build with `npm run build`, publish `dist`, and configure the host to serve `index.html` for client-side routes.
 
-Install dependencies
+## Screenshots
 
-```bash
-npm install
-```
+_Screenshots will be added here._
 
-Start development server
-
-```bash
-npm run dev
-```
-
----
-
-# 📷 Screenshots
-
-Coming Soon...
-
----
-
-# 🎯 Project Goals
-
-- Reduce Food Wastage
-- Improve Meal Planning
-- Simplify Hostel Mess Operations
-- Enhance Student Experience
-- Provide AI-Based Decision Support
-
----
-
-# 👨‍💻 Developer
-
-**Abhishek Kumar**
-
-B.Tech – Computer Science & Engineering
-
-KIET Group of Institutions
-
----
-
-# 📄 License
-
-This project is developed for educational, research, hackathon, and portfolio purposes.
-
----
-
-# ⭐ If you like this project, don't forget to star the repository.
+<!-- Add screenshots to a repository folder (for example, docs/screenshots/) and link them here. -->

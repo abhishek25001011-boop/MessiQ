@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
-import { AuthGuard } from "@/components/AuthGuard";
+import { AdminGuard, AuthGuard } from "@/components/AuthGuard";
 
 import LoginPage from "@/pages/LoginPage";
 import Dashboard from "@/pages/Dashboard";
@@ -52,7 +52,14 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/meals" element={<MealSelection />} />
             <Route path="/predictions" element={<AIPredictions />} />
-            <Route path="/admin" element={<AdminPanel />} />
+            <Route
+              path="/admin"
+              element={
+                <AdminGuard>
+                  <AdminPanel />
+                </AdminGuard>
+              }
+            />
             <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="/waste" element={<WasteDashboard />} />
             <Route path="/revenue" element={<RevenuePage />} />

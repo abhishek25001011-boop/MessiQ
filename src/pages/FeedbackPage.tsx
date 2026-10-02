@@ -13,8 +13,8 @@ import {
   getDoc,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
-  setDoc,
   where,
   type Timestamp,
 } from "firebase/firestore";
@@ -44,33 +44,68 @@ function getFeedbackDocId(uid: string, mealId: string) {
   return `${uid}_${mealId}`;
 }
 
+function getLocalDateString() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().split("T")[0];
+}
+
 export default function FeedbackPage() {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
   const [uid, setUid] = useState<string | null>(null);
+  const [isStudent, setIsStudent] = useState<boolean | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [currentMealId, setCurrentMealId] = useState<string | null>(null);
+  const [isMealLoading, setIsMealLoading] = useState(true);
+  const [mealError, setMealError] = useState<string | null>(null);
   const [feedbackList, setFeedbackList] = useState<FeedbackRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUid(user?.uid ?? null);
+      setCurrentMealId(null);
+      setIsMealLoading(Boolean(user));
+      setMealError(null);
+
+      if (!user) {
+        setIsStudent(false);
+        setAccessError("Please log in with a student account to submit feedback.");
+        return;
+      }
+
+      setIsStudent(null);
+      setAccessError(null);
+      try {
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        if (auth.currentUser?.uid !== user.uid) return;
+        const student = userSnap.exists() && userSnap.data().role === "student";
+        setIsStudent(student);
+        if (!student) setAccessError("Feedback is available to student accounts only.");
+      } catch (error) {
+        console.error("Failed to verify the student's profile:", error);
+        if (auth.currentUser?.uid !== user.uid) return;
+        setIsStudent(false);
+        setAccessError("Unable to verify your student account.");
+      }
     });
 
     return unsubscribeAuth;
   }, []);
 
   useEffect(() => {
-    if (!uid) {
+    if (!uid || isStudent !== true) {
       setFeedbackList([]);
-      setCurrentMealId(null);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setFeedbackError(null);
 
     const feedbackQuery = query(
       collection(db, "feedback"),
@@ -101,20 +136,26 @@ export default function FeedbackPage() {
         setFeedbackList(rows);
         setIsLoading(false);
       },
-      () => {
-        toast.error("Failed to load feedback.");
+      (error) => {
+        console.error("Failed to load feedback records:", error);
+        setFeedbackError("Failed to load feedback.");
         setIsLoading(false);
       },
     );
 
     return unsubscribeFeedback;
-  }, [uid]);
+  }, [uid, isStudent]);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || isStudent !== true) {
+      setIsMealLoading(false);
+      return;
+    }
 
     const resolveCurrentMealId = async () => {
-      const today = new Date().toISOString().split("T")[0];
+      setIsMealLoading(true);
+      setMealError(null);
+      const today = getLocalDateString();
 
       try {
         const selectionQuery = query(
@@ -130,7 +171,7 @@ export default function FeedbackPage() {
           const data = docSnap.data();
           selections.push({
             mealType: String(data.mealType || ""),
-            mealId: String(data.mealId || ""),
+            mealId: data.choice === "no" ? "" : String(data.mealId || ""),
           });
         });
 
@@ -140,16 +181,21 @@ export default function FeedbackPage() {
 
         setCurrentMealId(preferred?.mealId || fallback?.mealId || null);
       } catch (error) {
+        console.error("Failed to resolve today's meal for feedback:", error);
+        setMealError("Unable to load today's meal. Please try again later.");
         setCurrentMealId(null);
+      } finally {
+        setIsMealLoading(false);
       }
     };
 
     resolveCurrentMealId();
-  }, [uid]);
+  }, [uid, isStudent]);
 
   const handleSubmit = async () => {
-    if (!uid) {
-      toast.error("Please log in to submit feedback.");
+    const userId = auth.currentUser?.uid;
+    if (!userId || userId !== uid || isStudent !== true) {
+      toast.error("Please log in with a student account to submit feedback.");
       return;
     }
 
@@ -171,21 +217,19 @@ export default function FeedbackPage() {
     try {
       setIsSubmitting(true);
 
-      const feedbackId = getFeedbackDocId(uid, currentMealId);
+      const feedbackId = getFeedbackDocId(userId, currentMealId);
       const feedbackRef = doc(db, "feedback", feedbackId);
-      const duplicateSnapshot = await getDoc(feedbackRef);
+      await runTransaction(db, async (transaction) => {
+        const existingFeedback = await transaction.get(feedbackRef);
+        if (existingFeedback.exists()) throw new Error("FEEDBACK_ALREADY_EXISTS");
 
-      if (duplicateSnapshot.exists()) {
-        toast.error("Feedback already submitted for this meal.");
-        return;
-      }
-
-      await setDoc(feedbackRef, {
-        uid,
-        mealId: currentMealId,
-        rating,
-        comment: comment.trim(),
-        createdAt: serverTimestamp(),
+        transaction.set(feedbackRef, {
+          uid: userId,
+          mealId: currentMealId,
+          rating,
+          comment: comment.trim(),
+          createdAt: serverTimestamp(),
+        });
       });
 
       toast.success("Thank you for your feedback!");
@@ -193,7 +237,14 @@ export default function FeedbackPage() {
       setRating(0);
       setComment("");
     } catch (error) {
-      toast.error("Failed to submit feedback. Please try again.");
+      if (!(error instanceof Error && error.message === "FEEDBACK_ALREADY_EXISTS")) {
+        console.error("Failed to submit meal feedback:", error);
+      }
+      toast.error(
+        error instanceof Error && error.message === "FEEDBACK_ALREADY_EXISTS"
+          ? "Feedback already submitted for this meal."
+          : "Failed to submit feedback. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -220,6 +271,13 @@ export default function FeedbackPage() {
           Rate Today's Meal
         </h2>
 
+        {accessError && <p className="mb-4 text-sm text-destructive">{accessError}</p>}
+        {isMealLoading && <p className="mb-4 text-sm text-muted-foreground">Finding your meal...</p>}
+        {!isMealLoading && mealError && <p className="mb-4 text-sm text-destructive">{mealError}</p>}
+        {!isMealLoading && !mealError && isStudent && !currentMealId && (
+          <p className="mb-4 text-sm text-muted-foreground">No meal is available to rate today.</p>
+        )}
+
         <div className="flex gap-1 mb-4">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
@@ -229,6 +287,7 @@ export default function FeedbackPage() {
               onMouseEnter={() => setHover(star)}
               onMouseLeave={() => setHover(0)}
               className="transition-transform hover:scale-110"
+              disabled={isSubmitting || isStudent !== true || isMealLoading}
             >
               <Star
                 className={`h-8 w-8 ${
@@ -247,12 +306,12 @@ export default function FeedbackPage() {
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           className="mb-4"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isStudent !== true || isMealLoading}
         />
 
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isStudent !== true || isMealLoading || !currentMealId}
           className="gradient-primary text-primary-foreground hover:opacity-90"
         >
           <Send className="h-4 w-4 mr-2" />
@@ -269,6 +328,10 @@ export default function FeedbackPage() {
           {isLoading ? (
             <div className="glass-card rounded-xl p-6 text-center text-muted-foreground">
               Loading feedback...
+            </div>
+          ) : feedbackError ? (
+            <div className="glass-card rounded-xl p-6 text-center text-destructive">
+              {feedbackError}
             </div>
           ) : feedbackList.length === 0 ? (
             <div className="glass-card rounded-xl p-6 text-center text-muted-foreground">

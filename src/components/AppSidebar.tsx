@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { signOut } from "firebase/auth";
 import { auth } from "@/firebase";
+import { toast } from "sonner";
 
 const navItems = [
   {
@@ -149,9 +150,11 @@ export function AppSidebar() {
           onClick={async () => {
             try {
               await signOut(auth);
-            } finally {
               localStorage.removeItem("messiq-auth");
               window.location.href = "/login";
+            } catch (error) {
+              console.error("Failed to sign out:", error);
+              toast.error("Could not sign out. Please try again.");
             }
           }}
           className="hover:bg-sidebar-accent/80"

@@ -1,4 +1,4 @@
-import { prediction } from "@/data/predictions";
+import { prediction } from "@/data/Predictions";
 
 export default function AIPredictions() {
   return (

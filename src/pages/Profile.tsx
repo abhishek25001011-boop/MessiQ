@@ -1,4 +1,3 @@
-import { QRCodeSVG } from "qrcode.react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -46,6 +45,7 @@ const defaultProfile: ProfileData = {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
+  const [savedProfile, setSavedProfile] = useState<ProfileData>(defaultProfile);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -74,14 +74,17 @@ export default function ProfilePage() {
 
         const data = snap.data() as Partial<ProfileData>;
 
-        setProfile({
+        const loadedProfile = {
           ...defaultProfile,
           ...data,
           uid: user.uid,
           email: data.email || user.email || "",
           role: data.role || "student",
-        });
+        };
+        setProfile(loadedProfile);
+        setSavedProfile(loadedProfile);
       } catch (error) {
+        console.error("Failed to load the authenticated user's profile:", error);
         setLoadError("Failed to load profile. Please try again.");
         toast.error("Failed to load profile. Please try again.");
       } finally {
@@ -102,15 +105,21 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
-    if (!profile.uid) {
+    const userId = auth.currentUser?.uid;
+    if (!userId || userId !== profile.uid) {
       toast.error("Unable to save profile. User not found.");
+      return;
+    }
+
+    if (!profile.name.trim()) {
+      toast.error("Name is required.");
       return;
     }
 
     try {
       setIsSaving(true);
 
-      const userRef = doc(db, "users", profile.uid);
+      const userRef = doc(db, "users", userId);
       await setDoc(
         userRef,
         {
@@ -128,9 +137,13 @@ export default function ProfilePage() {
         { merge: true }
       );
 
+      const updatedProfile = { ...profile, name: profile.name.trim() };
+      setProfile(updatedProfile);
+      setSavedProfile(updatedProfile);
       setIsEditing(false);
       toast.success("Profile updated successfully!");
     } catch (error) {
+      console.error("Failed to save the authenticated user's profile:", error);
       toast.error("Failed to save profile. Please try again.");
     } finally {
       setIsSaving(false);
@@ -326,7 +339,10 @@ export default function ProfilePage() {
       <div className="flex justify-end gap-4">
         <Button
           variant="outline"
-          onClick={() => setIsEditing((prev) => !prev)}
+          onClick={() => {
+            if (isEditing) setProfile(savedProfile);
+            setIsEditing((prev) => !prev);
+          }}
           disabled={isSaving}
         >
           <Pencil className="w-4 h-4 mr-2" />

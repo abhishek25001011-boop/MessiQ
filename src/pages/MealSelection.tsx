@@ -6,16 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { auth, db } from "@/firebase";
+import { FirebaseError } from "firebase/app";
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
   query,
   serverTimestamp,
-  setDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -62,8 +62,14 @@ const mealSlots = [
   },
 ] as const;
 
+function getLocalDateString() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().split("T")[0];
+}
+
 export default function MealSelection() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalDateString();
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [selections, setSelections] = useState<Record<string, MealState>>({
@@ -127,6 +133,7 @@ export default function MealSelection() {
 
         setMenuByType(grouped);
       } catch (error) {
+        console.error("Failed to load meal menu:", error);
         setMenuError("Failed to load menu. Please try again.");
       } finally {
         setIsMenuLoading(false);
@@ -168,7 +175,7 @@ export default function MealSelection() {
           const mealType = String(data.mealType || "").toLowerCase();
 
           if (mealType === "breakfast" || mealType === "lunch" || mealType === "snacks" || mealType === "dinner") {
-            const choice = data.choice === "custom" ? "custom" : "yes";
+            const choice = data.choice === "custom" ? "custom" : data.choice === "no" ? "no" : "yes";
             nextSelections[mealType] = {
               choice,
               customNote: choice === "custom" ? String(data.customNote || "") : "",
@@ -182,7 +189,8 @@ export default function MealSelection() {
         }));
         setIsSelectionLoading(false);
       },
-      () => {
+      (error) => {
+        console.error("Failed to load meal selections:", error);
         setSelectionError("Failed to load your meal selections.");
         setIsSelectionLoading(false);
       },
@@ -247,49 +255,69 @@ export default function MealSelection() {
   };
 
   const handleSave = async () => {
-    if (!uid) {
+    const userId = auth.currentUser?.uid;
+
+    if (!userId || userId !== uid) {
       toast.error("You must be logged in to save meal selections.");
+      return;
+    }
+
+    const invalidCustomMeal = mealSlots.find(
+      (slot) => selections[slot.key].choice === "custom" && !selections[slot.key].customNote.trim(),
+    );
+    if (invalidCustomMeal) {
+      toast.error(`Please add a custom note for ${invalidCustomMeal.key}`);
       return;
     }
 
     try {
       setIsSaving(true);
 
-      const tasks = mealSlots.map(async (slot) => {
+      const batch = writeBatch(db);
+
+      mealSlots.forEach((slot) => {
         const mealType = slot.key;
         const state = selections[mealType];
         const mealId = getSelectedMealId(mealType);
-        const selectionId = getSelectionDocId(uid, selectedDate, mealType);
+        const selectionId = getSelectionDocId(userId, selectedDate, mealType);
         const selectionRef = doc(db, "mealSelections", selectionId);
 
-        if (state.choice === "no") {
-          await deleteDoc(selectionRef);
-          return;
-        }
-
-        if (!mealId) {
-          throw new Error(`No menu available for ${mealType}`);
-        }
-
-        if (state.choice === "custom" && !state.customNote.trim()) {
-          throw new Error(`Please add a custom note for ${mealType}`);
-        }
-
-        await setDoc(selectionRef, {
-          uid,
+        batch.set(selectionRef, {
+          uid: userId,
           date: selectedDate,
           mealType,
-          mealId,
+          ...(mealId ? { mealId } : {}),
           choice: state.choice,
           customNote: state.choice === "custom" ? state.customNote.trim() : "",
           createdAt: serverTimestamp(),
         });
       });
 
-      await Promise.all(tasks);
+      const selectionsQuery = query(
+        collection(db, "mealSelections"),
+        where("uid", "==", userId),
+        where("date", "==", selectedDate),
+      );
+      const existingSelections = await getDocs(selectionsQuery);
+      const canonicalIds = new Set(
+        mealSlots.map((slot) => getSelectionDocId(userId, selectedDate, slot.key)),
+      );
+
+      existingSelections.forEach((selection) => {
+        if (!canonicalIds.has(selection.id)) {
+          batch.delete(selection.ref);
+        }
+      });
+
+      await batch.commit();
       toast.success("Meal preferences saved successfully!");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save meal preferences. Please try again.";
+      console.error("Failed to save meal preferences:", error);
+      const message = error instanceof FirebaseError && error.code === "permission-denied"
+        ? "You don't have permission to save these meal preferences."
+        : error instanceof FirebaseError && error.code === "unavailable"
+          ? "The service is temporarily unavailable. Please try again."
+          : "Failed to save meal preferences. Please try again.";
       toast.error(message);
     } finally {
       setIsSaving(false);

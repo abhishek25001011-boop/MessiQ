@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const getAuthErrorMessage = (error: unknown) => {
@@ -50,8 +51,10 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     try {
+      setIsSubmitting(true);
       if (isSignup) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -88,7 +91,10 @@ export default function LoginPage() {
 
       navigate("/dashboard");
     } catch (error) {
+      console.error("Authentication request failed:", error);
       toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -135,14 +141,14 @@ export default function LoginPage() {
                 <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" required />
               </div>
             </div>
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-90">
-              {isSignup ? "Sign Up" : "Login"}
+            <Button type="submit" disabled={isSubmitting} className="w-full gradient-primary text-primary-foreground hover:opacity-90">
+              {isSubmitting ? "Please wait..." : isSignup ? "Sign Up" : "Login"}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button onClick={() => setIsSignup(!isSignup)} className="text-primary font-medium hover:underline">
+            <button disabled={isSubmitting} onClick={() => setIsSignup(!isSignup)} className="text-primary font-medium hover:underline disabled:opacity-50">
               {isSignup ? "Login" : "Sign Up"}
             </button>
           </p>

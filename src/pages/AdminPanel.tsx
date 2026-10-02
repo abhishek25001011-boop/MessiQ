@@ -25,7 +25,8 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
+  type Timestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,15 @@ interface MealRecord {
   description: string;
 }
 
+interface FeedbackRecord {
+  id: string;
+  student: string;
+  meal: string;
+  rating: number;
+  comment: string;
+  createdAt?: Timestamp;
+}
+
 const initialMetrics: AdminMetrics = {
   totalStudents: 0,
   todaysMealSelections: 0,
@@ -104,8 +114,14 @@ const initialMetrics: AdminMetrics = {
 
 const mealTypeOptions: MealType[] = ["breakfast", "lunch", "snacks", "dinner"];
 
+function getLocalDateString() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().split("T")[0];
+}
+
 const emptyMealForm = {
-  date: new Date().toISOString().split("T")[0],
+  date: getLocalDateString(),
   type: "breakfast" as MealType,
   name: "",
   description: "",
@@ -118,6 +134,7 @@ export default function AdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [meals, setMeals] = useState<MealRecord[]>([]);
+  const [feedbackRecords, setFeedbackRecords] = useState<FeedbackRecord[]>([]);
   const [search, setSearch] = useState("");
   const [isMealDialogOpen, setIsMealDialogOpen] = useState(false);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
@@ -125,7 +142,9 @@ export default function AdminPanel() {
   const [isSavingMeal, setIsSavingMeal] = useState(false);
 
   useEffect(() => {
+    let authChangeId = 0;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const requestId = ++authChangeId;
       if (!user) {
         setIsAdmin(false);
         setError("You must be logged in to access admin functionality.");
@@ -135,10 +154,12 @@ export default function AdminPanel() {
 
       try {
         setIsLoading(true);
+        setIsAdmin(false);
         setError(null);
 
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
+        if (requestId !== authChangeId || auth.currentUser?.uid !== user.uid) return;
         const role = String(userSnap.data()?.role || "");
 
         if (role !== "admin") {
@@ -150,7 +171,7 @@ export default function AdminPanel() {
 
         setIsAdmin(true);
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = getLocalDateString();
 
         const studentsQuery = query(
           collection(db, "users"),
@@ -169,9 +190,11 @@ export default function AdminPanel() {
           getDocs(feedbackQuery),
           getDocs(mealsQuery),
         ]);
+        if (requestId !== authChangeId || auth.currentUser?.uid !== user.uid) return;
 
         const totalStudents = studentsSnap.size;
-        const todaysMealSelections = selectionsSnap.size;
+        const studentUids = new Set(studentsSnap.docs.map((studentDoc) => studentDoc.id));
+        let todaysMealSelections = 0;
         const uniqueParticipants = new Set<string>();
         const mealCounts: AdminMetrics["mealCounts"] = {
           breakfast: 0,
@@ -183,13 +206,14 @@ export default function AdminPanel() {
         selectionsSnap.forEach((docSnap) => {
           const uid = String(docSnap.data().uid || "");
           const mealType = String(docSnap.data().mealType || "").toLowerCase() as MealType;
+          if (!uid || !studentUids.has(uid) || !mealTypeOptions.includes(mealType)) return;
+
+          todaysMealSelections += 1;
           if (uid) {
             uniqueParticipants.add(uid);
           }
 
-          if (mealType in mealCounts) {
-            mealCounts[mealType] += 1;
-          }
+          mealCounts[mealType] += 1;
         });
 
         const studentRows: StudentRecord[] = [];
@@ -231,6 +255,24 @@ export default function AdminPanel() {
             ? Math.round((uniqueParticipants.size / totalStudents) * 100)
             : 0;
 
+        const studentsByUid = new Map(studentRows.map((student) => [student.uid, student]));
+        const mealsById = new Map(mealRows.map((meal) => [meal.id, meal]));
+        const feedbackRows: FeedbackRecord[] = feedbackSnap.docs.map((feedbackDoc) => {
+          const data = feedbackDoc.data();
+          const student = studentsByUid.get(String(data.uid || ""));
+          const mealId = String(data.mealId || "");
+          const meal = mealsById.get(mealId);
+
+          return {
+            id: feedbackDoc.id,
+            student: student?.name || student?.email || String(data.uid || "Unknown student"),
+            meal: meal?.name || (mealId ? `Meal (${mealId})` : "Unknown meal"),
+            rating: Number(data.rating || 0),
+            comment: String(data.comment || ""),
+            createdAt: data.createdAt as Timestamp | undefined,
+          };
+        }).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+
         setMetrics({
           totalStudents,
           todaysMealSelections,
@@ -240,14 +282,19 @@ export default function AdminPanel() {
         });
         setStudents(studentRows);
         setMeals(mealRows);
+        setFeedbackRecords(feedbackRows);
       } catch (loadError) {
-        setError("Failed to load admin dashboard data.");
+        console.error("Failed to load admin dashboard data:", loadError);
+        if (requestId === authChangeId) setError("Failed to load admin dashboard data.");
       } finally {
-        setIsLoading(false);
+        if (requestId === authChangeId) setIsLoading(false);
       }
     });
 
-    return unsubscribe;
+    return () => {
+      authChangeId += 1;
+      unsubscribe();
+    };
   }, []);
   useEffect(() => {
     if (!isAdmin) {
@@ -273,7 +320,8 @@ export default function AdminPanel() {
         });
         setMeals(mealRows);
       },
-      () => {
+      (error) => {
+        console.error("Failed to listen for meal entry changes:", error);
         toast.error("Failed to load meal entries.");
       },
     );
@@ -290,6 +338,7 @@ export default function AdminPanel() {
         student.name,
         student.email,
         student.roll,
+        student.role,
         student.branch,
         student.year,
         student.section,
@@ -332,17 +381,12 @@ export default function AdminPanel() {
       setIsSavingMeal(true);
 
       if (editingMealId) {
-        await setDoc(
-          doc(db, "meals", editingMealId),
-          {
-            date: mealForm.date,
-            type: mealForm.type,
-            name: mealForm.name.trim(),
-            description: mealForm.description.trim(),
-            createdAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
+        await updateDoc(doc(db, "meals", editingMealId), {
+          date: mealForm.date,
+          type: mealForm.type,
+          name: mealForm.name.trim(),
+          description: mealForm.description.trim(),
+        });
       } else {
         await addDoc(collection(db, "meals"), {
           date: mealForm.date,
@@ -358,6 +402,7 @@ export default function AdminPanel() {
       setEditingMealId(null);
       setMealForm(emptyMealForm);
     } catch (saveError) {
+      console.error("Failed to save meal entry:", saveError);
       toast.error("Failed to save meal entry.");
     } finally {
       setIsSavingMeal(false);
@@ -369,6 +414,7 @@ export default function AdminPanel() {
       await deleteDoc(doc(db, "meals", mealId));
       toast.success("Meal deleted successfully!");
     } catch (deleteError) {
+      console.error("Failed to delete meal entry:", deleteError);
       toast.error("Failed to delete meal entry.");
     }
   };
@@ -485,12 +531,13 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
+              <div className="rounded-lg border overflow-x-auto">
+                <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead>Branch</TableHead>
                       <TableHead>Hostel</TableHead>
                     </TableRow>
@@ -498,7 +545,7 @@ export default function AdminPanel() {
                   <TableBody>
                     {filteredStudents.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
                           No students found.
                         </TableCell>
                       </TableRow>
@@ -510,6 +557,7 @@ export default function AdminPanel() {
                             <div className="text-xs text-muted-foreground">{student.roll || student.subscription || "Student"}</div>
                           </TableCell>
                           <TableCell>{student.email || "-"}</TableCell>
+                          <TableCell className="capitalize">{student.role}</TableCell>
                           <TableCell>{[student.branch, student.year, student.section].filter(Boolean).join(" ") || "-"}</TableCell>
                           <TableCell>{[student.hostel, student.room].filter(Boolean).join(" ") || "-"}</TableCell>
                         </TableRow>
@@ -537,8 +585,8 @@ export default function AdminPanel() {
               </Button>
             </div>
 
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
+            <div className="rounded-lg border overflow-x-auto">
+              <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -573,6 +621,52 @@ export default function AdminPanel() {
                               Delete
                             </Button>
                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-xl p-6"
+          >
+            <div className="mb-4">
+              <h2 className="font-display font-semibold">Student Feedback</h2>
+              <p className="text-sm text-muted-foreground">Submitted ratings and comments from Firestore</p>
+            </div>
+
+            <div className="rounded-lg border overflow-x-auto">
+              <Table className="min-w-[760px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Meal</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Comment</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {feedbackRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No feedback has been submitted yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    feedbackRecords.map((feedback) => (
+                      <TableRow key={feedback.id}>
+                        <TableCell>{feedback.student}</TableCell>
+                        <TableCell>{feedback.meal}</TableCell>
+                        <TableCell>{feedback.rating} / 5</TableCell>
+                        <TableCell className="max-w-sm whitespace-normal break-words">{feedback.comment}</TableCell>
+                        <TableCell>
+                          {feedback.createdAt?.toDate().toLocaleString() ?? "Pending"}
                         </TableCell>
                       </TableRow>
                     ))

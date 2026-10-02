@@ -1,8 +1,6 @@
-import Leaderboard from "@/components/Leaderboard";
-import { getSelectedMealCount } from "@/lib/storage";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Users, UtensilsCrossed, TrendingDown, Leaf, Sun, Moon, Coffee } from "lucide-react";
+import { CalendarDays, Check, Coffee, Moon, Sun, UtensilsCrossed, X } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { auth, db } from "@/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -17,31 +15,83 @@ import {
 } from "@/components/ui/table";
 
 type MealType = "breakfast" | "lunch" | "snacks" | "dinner";
+type MealChoice = "yes" | "no" | "custom";
+
+const mealTypes: { key: MealType; label: string; icon: typeof Coffee }[] = [
+  { key: "breakfast", label: "Breakfast", icon: Coffee },
+  { key: "lunch", label: "Lunch", icon: Sun },
+  { key: "snacks", label: "Snacks", icon: UtensilsCrossed },
+  { key: "dinner", label: "Dinner", icon: Moon },
+];
+
+function getLocalDateString() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().split("T")[0];
+}
+
+interface MealMenuItem {
+  type: MealType;
+  name: string;
+  description: string;
+}
+
+interface MealPreference {
+  choice: MealChoice;
+  customNote: string;
+}
 
 interface MealHistoryRow {
   date: string;
-  breakfast: boolean;
-  lunch: boolean;
-  snacks: boolean;
-  dinner: boolean;
+  breakfast?: MealPreference;
+  lunch?: MealPreference;
+  snacks?: MealPreference;
+  dinner?: MealPreference;
 }
 
-const todayMeals = [
-  { time: "Breakfast", icon: Coffee, items: "Poha, Bread-Butter, Tea, Banana", timing: "7:30 – 9:00 AM" },
-  { time: "Lunch", icon: Sun, items: "Rice, Dal, Paneer Curry, Roti, Salad", timing: "12:00 – 2:00 PM" },
-  { time: "Dinner", icon: Moon, items: "Chapati, Mixed Veg, Rice, Curd", timing: "7:00 – 9:00 PM" },
-];
-
-const tomorrowMeals = [
-  { time: "Breakfast", icon: Coffee, items: "Idli-Sambar, Chutney, Coffee", timing: "7:30 – 9:00 AM" },
-  { time: "Lunch", icon: Sun, items: "Biryani, Raita, Gulab Jamun", timing: "12:00 – 2:00 PM" },
-  { time: "Dinner", icon: Moon, items: "Chole-Bhature, Rice, Salad", timing: "7:00 – 9:00 PM" },
-];
 export default function Dashboard() {
-  const selectedMeals = getSelectedMealCount();
   const [historyRows, setHistoryRows] = useState<MealHistoryRow[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [todayMenu, setTodayMenu] = useState<MealMenuItem[]>([]);
+  const [isMenuLoading, setIsMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  const today = getLocalDateString();
+  const todayHistory = historyRows.find((row) => row.date === today);
+  const todayPreferences = mealTypes
+    .map(({ key }) => todayHistory?.[key])
+    .filter((preference): preference is MealPreference => Boolean(preference));
+  const todaySelectedCount = todayPreferences.filter((preference) => preference.choice !== "no").length;
+  const todaySkippedCount = todayPreferences.filter((preference) => preference.choice === "no").length;
+
+  useEffect(() => {
+    const menuQuery = query(collection(db, "meals"), where("date", "==", today));
+    return onSnapshot(
+      menuQuery,
+      (snapshot) => {
+        const menu: MealMenuItem[] = [];
+        snapshot.forEach((mealDoc) => {
+          const data = mealDoc.data();
+          const type = String(data.type || "").toLowerCase();
+          if (type === "breakfast" || type === "lunch" || type === "snacks" || type === "dinner") {
+            menu.push({
+              type,
+              name: String(data.name || ""),
+              description: String(data.description || ""),
+            });
+          }
+        });
+        setTodayMenu(menu);
+        setMenuError(null);
+        setIsMenuLoading(false);
+      },
+      (error) => {
+        console.error("Failed to load today's meal menu:", error);
+        setMenuError("Failed to load today's menu.");
+        setIsMenuLoading(false);
+      },
+    );
+  }, [today]);
 
   useEffect(() => {
     let unsubscribeSelections: (() => void) | undefined;
@@ -61,6 +111,7 @@ export default function Dashboard() {
 
       setIsHistoryLoading(true);
       setHistoryError(null);
+      setHistoryRows([]);
 
       const selectionsQuery = query(
         collection(db, "mealSelections"),
@@ -81,27 +132,24 @@ export default function Dashboard() {
               return;
             }
 
-            if (!byDate.has(date)) {
-              byDate.set(date, {
-                date,
-                breakfast: false,
-                lunch: false,
-                snacks: false,
-                dinner: false,
-              });
-            }
-
+            if (!byDate.has(date)) byDate.set(date, { date });
             const existing = byDate.get(date);
             if (!existing) return;
 
-            existing[mealType as MealType] = true;
+            const choice: MealChoice = data.choice === "no" || data.choice === "custom" ? data.choice : "yes";
+            existing[mealType as MealType] = {
+              choice,
+              customNote: String(data.customNote || ""),
+            };
           });
 
           const rows = Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
           setHistoryRows(rows);
+          setHistoryError(null);
           setIsHistoryLoading(false);
         },
-        () => {
+        (error) => {
+          console.error("Failed to load meal history:", error);
           setHistoryError("Failed to load meal history.");
           setIsHistoryLoading(false);
         },
@@ -110,9 +158,7 @@ export default function Dashboard() {
 
     return () => {
       unsubscribeAuth();
-      if (unsubscribeSelections) {
-        unsubscribeSelections();
-      }
+      if (unsubscribeSelections) unsubscribeSelections();
     };
   }, []);
 
@@ -124,21 +170,79 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Students" value="1,248" subtitle="Opted in" icon={Users} gradient="primary" />
-        <StatCard
-  title="Selected Meals"
-  value={selectedMeals.toString()}
-  subtitle="Today's selections"
-  icon={UtensilsCrossed}
-  gradient="warm"
-/>
-        <StatCard title="Waste Reduction" value="32%" subtitle="This week" icon={TrendingDown} gradient="cool" />
-        <StatCard title="Food Saved" value="45 kg" subtitle="This week" icon={Leaf} gradient="primary" />
+        <StatCard title="Today's Meal Choices" value={isHistoryLoading || historyError ? "—" : todayPreferences.length} subtitle="Saved to Firestore" icon={UtensilsCrossed} gradient="primary" />
+        <StatCard title="Selected / Custom" value={isHistoryLoading || historyError ? "—" : todaySelectedCount} subtitle="Today's choices" icon={Check} gradient="warm" />
+        <StatCard title="Skipped Today" value={isHistoryLoading || historyError ? "—" : todaySkippedCount} subtitle="Today's choices" icon={X} gradient="cool" />
+        <StatCard title="Meal History Dates" value={isHistoryLoading || historyError ? "—" : historyRows.length} subtitle="Dates with saved choices" icon={CalendarDays} gradient="primary" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MealCard title="Today's Menu" meals={todayMeals} />
-        <MealCard title="Tomorrow's Menu" meals={tomorrowMeals} />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="glass-card rounded-xl p-6"
+        >
+          <h2 className="font-display font-semibold text-lg mb-4">Today's Menu</h2>
+          {isMenuLoading ? (
+            <p className="text-sm text-muted-foreground">Loading menu...</p>
+          ) : menuError ? (
+            <p className="text-sm text-destructive">{menuError}</p>
+          ) : todayMenu.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No menu available for today.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {mealTypes.map(({ key, label, icon: Icon }) => {
+                const meals = todayMenu.filter((meal) => meal.type === key);
+                return (
+                  <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-medium text-sm">{label}</span>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {meals.length
+                          ? meals.map((meal) => meal.description ? `${meal.name} (${meal.description})` : meal.name).join(", ")
+                          : "No menu available."}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="glass-card rounded-xl p-6"
+        >
+          <h2 className="font-display font-semibold text-lg mb-4">Today's Meal Status</h2>
+          <div className="space-y-3">
+            {mealTypes.map(({ key, label, icon: Icon }) => {
+              const preference = todayHistory?.[key];
+              const status = !preference
+                ? "Not saved"
+                : preference.choice === "no"
+                  ? "Skipped"
+                  : preference.choice === "custom"
+                    ? `Custom: ${preference.customNote || "Request saved"}`
+                    : "Selected";
+
+              return (
+                <div key={key} className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <span className="font-medium text-sm">{label}</span>
+                    <p className="break-words text-sm text-muted-foreground">{status}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
       </div>
 
       <motion.div
@@ -149,21 +253,15 @@ export default function Dashboard() {
       >
         <h2 className="font-display font-semibold text-lg mb-4">Meal History</h2>
 
-        {isHistoryLoading && (
-          <p className="text-sm text-muted-foreground">Loading meal history...</p>
-        )}
-
-        {!isHistoryLoading && historyError && (
-          <p className="text-sm text-destructive">{historyError}</p>
-        )}
-
+        {isHistoryLoading && <p className="text-sm text-muted-foreground">Loading meal history...</p>}
+        {!isHistoryLoading && historyError && <p className="text-sm text-destructive">{historyError}</p>}
         {!isHistoryLoading && !historyError && historyRows.length === 0 && (
           <p className="text-sm text-muted-foreground">No meal history yet.</p>
         )}
 
         {!isHistoryLoading && !historyError && historyRows.length > 0 && (
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
+          <div className="rounded-lg border overflow-x-auto">
+            <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -177,10 +275,10 @@ export default function Dashboard() {
                 {historyRows.map((row) => (
                   <TableRow key={row.date}>
                     <TableCell className="font-medium">{row.date}</TableCell>
-                    <TableCell>{row.breakfast ? "Selected" : "Not Selected"}</TableCell>
-                    <TableCell>{row.lunch ? "Selected" : "Not Selected"}</TableCell>
-                    <TableCell>{row.snacks ? "Selected" : "Not Selected"}</TableCell>
-                    <TableCell>{row.dinner ? "Selected" : "Not Selected"}</TableCell>
+                    <TableCell>{formatMealChoice(row.breakfast)}</TableCell>
+                    <TableCell>{formatMealChoice(row.lunch)}</TableCell>
+                    <TableCell>{formatMealChoice(row.snacks)}</TableCell>
+                    <TableCell>{formatMealChoice(row.dinner)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -192,32 +290,11 @@ export default function Dashboard() {
   );
 }
 
-function MealCard({ title, meals }: { title: string; meals: typeof todayMeals }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="glass-card rounded-xl p-6"
-    >
-      <h2 className="font-display font-semibold text-lg mb-4">{title}</h2>
-      <div className="space-y-4">
-        {meals.map((meal) => (
-          <div key={meal.time} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <meal.icon className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">{meal.time}</span>
-                <span className="text-xs text-muted-foreground">{meal.timing}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5">{meal.items}</p>
-            </div>
-          </div>
-        ))}
-        <Leaderboard />
-      </div>
-    </motion.div>
-  );
+function formatMealChoice(preference?: MealPreference) {
+  if (!preference) return "—";
+  if (preference.choice === "no") return "Skipped";
+  if (preference.choice === "custom") {
+    return preference.customNote ? `Custom: ${preference.customNote}` : "Custom";
+  }
+  return "Selected";
 }

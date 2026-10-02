@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isStudent() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
+    function validMeal(data) {
+      return data.keys().hasAll(['date', 'type', 'name', 'description', 'createdAt'])
+        && data.keys().hasOnly(['date', 'type', 'name', 'description', 'createdAt'])
+        && data.date is string
+        && data.date.size() > 0
+        && data.type in ['breakfast', 'lunch', 'snacks', 'dinner']
+        && data.name is string
+        && data.name.size() > 0
+        && data.description is string
+        && data.createdAt is timestamp;
+    }
+
+    function validPreference(uid, preferenceId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['uid', 'date', 'mealType', 'choice', 'customNote', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'date', 'mealType', 'choice', 'customNote', 'createdAt', 'mealId'])
+        && data.uid == uid
+        && data.date is string
+        && data.date.size() > 0
+        && data.mealType in ['breakfast', 'lunch', 'snacks', 'dinner']
+        && data.choice in ['yes', 'no', 'custom']
+        && data.customNote is string
+        && (data.choice != 'custom' || data.customNote.size() > 0)
+        && (!('mealId' in data) || data.mealId is string)
+        && data.createdAt is timestamp
+        && preferenceId == data.uid + '_' + data.date + '_' + data.mealType;
+    }
+
+    function validFeedback(uid, feedbackId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['uid', 'mealId', 'rating', 'comment', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'mealId', 'rating', 'comment', 'createdAt'])
+        && data.uid == uid
+        && data.mealId is string
+        && data.mealId.size() > 0
+        && data.rating is int
+        && data.rating >= 1
+        && data.rating <= 5
+        && data.comment is string
+        && data.comment.size() > 0
+        && data.createdAt is timestamp
+        && feedbackId == data.uid + '_' + data.mealId;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() || (
+        isOwner(uid)
+        && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'role', 'createdAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'student'
+        && request.resource.data.createdAt is timestamp
+      );
+
+      allow update: if (isAdmin()
+        && (uid != request.auth.uid || request.resource.data.role == resource.data.role)) || (
+        isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'phone', 'roll', 'branch', 'year', 'section', 'hostel', 'room', 'subscription', 'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.updatedAt == request.time
+      );
+
+      allow delete: if isAdmin() && uid != request.auth.uid;
+    }
+
+    match /meals/{mealId} {
+      // The current app publishes admin-created meal documents directly in this collection.
+      allow read: if isStudent() || isAdmin();
+      allow create: if isAdmin()
+        && validMeal(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        && validMeal(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /mealSelections/{preferenceId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.uid == request.auth.uid);
+      allow create, update: if isStudent()
+        && validPreference(request.auth.uid, preferenceId)
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isAdmin() || (isStudent() && resource.data.uid == request.auth.uid);
+    }
+
+    match /feedback/{feedbackId} {
+      allow get: if isAdmin() || (isStudent() && (
+        !exists(/databases/$(database)/documents/feedback/$(feedbackId))
+        || resource.data.uid == request.auth.uid
+      ));
+      allow list: if isAdmin() || (isStudent() && resource.data.uid == request.auth.uid);
+      allow create: if (isAdmin() || (isStudent() && request.resource.data.uid == request.auth.uid))
+        && validFeedback(request.resource.data.uid, feedbackId)
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
