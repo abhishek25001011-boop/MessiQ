@@ -19,6 +19,7 @@ export function filterNavigationItems<T extends { url: string }>(
   role: AppRole | null,
 ): T[] {
   return items.filter(({ url }) => {
+    if (url === "/meal-responses") return role === "admin";
     if (url === "/meals" || url === "/feedback") return role === "student";
     if (["/admin", "/predictions", "/waste", "/revenue"].includes(url)) {
       return role === "admin";

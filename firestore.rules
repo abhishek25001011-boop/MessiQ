@@ -81,7 +81,9 @@ service cloud.firestore {
       );
 
       allow update: if (isAdmin()
-        && (uid != request.auth.uid || request.resource.data.role == resource.data.role)) || (
+        && (uid != request.auth.uid || request.resource.data.role == resource.data.role)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['paymentStatus'])
+          || request.resource.data.paymentStatus in ['paid', 'unpaid'])) || (
         isOwner(uid)
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email

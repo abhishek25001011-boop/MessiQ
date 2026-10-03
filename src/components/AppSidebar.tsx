@@ -37,11 +37,6 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Meal Selection",
-    url: "/meals",
-    icon: UtensilsCrossed,
-  },
-  {
     title: "AI Predictions",
     url: "/predictions",
     icon: BrainCircuit,
@@ -52,9 +47,9 @@ const navItems = [
     icon: ChefHat,
   },
   {
-    title: "Feedback",
-    url: "/feedback",
-    icon: MessageSquare,
+    title: "Meal Responses",
+    url: "/meal-responses",
+    icon: ChefHat,
   },
   {
     title: "Waste Dashboard",
@@ -99,7 +94,15 @@ export function AppSidebar() {
   }, []);
 
   const collapsed = state === "collapsed";
-  const visibleNavItems = filterNavigationItems(navItems, userRole);
+  const roleNavItems = userRole === "admin"
+    ? navItems
+    : [
+      navItems[0],
+      { title: "Profile", url: "/profile", icon: User },
+      { title: "Meal Selection", url: "/meals", icon: UtensilsCrossed },
+      { title: "Feedback", url: "/feedback", icon: MessageSquare },
+    ];
+  const visibleNavItems = filterNavigationItems(roleNavItems, userRole);
 
   return (
     <Sidebar collapsible="icon">

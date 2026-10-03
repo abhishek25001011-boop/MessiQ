@@ -15,6 +15,7 @@ import FeedbackPage from "@/pages/FeedbackPage";
 import WasteDashboard from "@/pages/WasteDashboard";
 import RevenuePage from "@/pages/RevenuePage";
 import ProfilePage from "@/pages/Profile";
+import MealResponses from "@/pages/MealResponses";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/feedback" element={<StudentGuard><FeedbackPage /></StudentGuard>} />
             <Route path="/waste" element={<AdminGuard><WasteDashboard /></AdminGuard>} />
             <Route path="/revenue" element={<AdminGuard><RevenuePage /></AdminGuard>} />
+            <Route path="/meal-responses" element={<AdminGuard><MealResponses /></AdminGuard>} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 

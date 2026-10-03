@@ -14,6 +14,7 @@ import {
 import { StatCard } from "@/components/StatCard";
 import { auth, db } from "@/firebase";
 import { calculateMealParticipationPercentage } from "@/lib/adminMetrics";
+import { getPaymentStatus } from "@/lib/mealResponses";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   addDoc,
@@ -86,6 +87,7 @@ interface StudentRecord {
   hostel?: string;
   room?: string;
   subscription?: string;
+  paymentStatus: "paid" | "unpaid";
 }
 
 interface MealRecord {
@@ -251,6 +253,7 @@ export default function AdminPanel() {
             hostel: String(data.hostel || ""),
             room: String(data.room || ""),
             subscription: String(data.subscription || ""),
+            paymentStatus: getPaymentStatus(data.paymentStatus),
           });
         });
 
@@ -439,6 +442,17 @@ export default function AdminPanel() {
     }
   };
 
+  const handlePaymentStatusChange = async (student: StudentRecord, paymentStatus: "paid" | "unpaid") => {
+    try {
+      await updateDoc(doc(db, "users", student.uid), { paymentStatus });
+      setStudents((current) => current.map((item) => item.uid === student.uid ? { ...item, paymentStatus } : item));
+      toast.success(`Payment status set to ${paymentStatus === "paid" ? "Paid" : "Unpaid"}.`);
+    } catch (statusError) {
+      console.error("Failed to update student payment status:", statusError);
+      toast.error("Could not update payment status.");
+    }
+  };
+
 
   const isEmpty =
     !isLoading &&
@@ -573,7 +587,7 @@ export default function AdminPanel() {
               </div>
 
               <div className="rounded-lg border overflow-x-auto">
-                <Table className="min-w-[680px]">
+                <Table className="min-w-[820px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -581,12 +595,13 @@ export default function AdminPanel() {
                       <TableHead>Role</TableHead>
                       <TableHead>Branch</TableHead>
                       <TableHead>Hostel</TableHead>
+                      <TableHead>Payment Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredStudents.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
                           No students found.
                         </TableCell>
                       </TableRow>
@@ -601,6 +616,20 @@ export default function AdminPanel() {
                           <TableCell className="capitalize">{student.role}</TableCell>
                           <TableCell>{[student.branch, student.year, student.section].filter(Boolean).join(" ") || "-"}</TableCell>
                           <TableCell>{[student.hostel, student.room].filter(Boolean).join(" ") || "-"}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={student.paymentStatus}
+                              onValueChange={(value) => handlePaymentStatusChange(student, value as "paid" | "unpaid")}
+                            >
+                              <SelectTrigger aria-label={`Payment status for ${student.name || student.email}`} className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="paid">Paid</SelectItem>
+                                <SelectItem value="unpaid">Unpaid</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

@@ -10,6 +10,7 @@ const navigation = [
   { url: "/meals" },
   { url: "/feedback" },
   { url: "/admin" },
+  { url: "/meal-responses" },
   { url: "/predictions" },
   { url: "/waste" },
   { url: "/revenue" },
@@ -30,11 +31,13 @@ describe("role access and navigation", () => {
     expect(studentLinks).toContain("/feedback");
     expect(studentLinks).not.toContain("/revenue");
     expect(studentLinks).not.toContain("/admin");
+    expect(studentLinks).not.toContain("/meal-responses");
   });
 
   it("shows admin links but hides student-only links from admins", () => {
     const adminLinks = filterNavigationItems(navigation, "admin").map(({ url }) => url);
     expect(adminLinks).toContain("/admin");
+    expect(adminLinks).toContain("/meal-responses");
     expect(adminLinks).toContain("/predictions");
     expect(adminLinks).toContain("/revenue");
     expect(adminLinks).not.toContain("/meals");

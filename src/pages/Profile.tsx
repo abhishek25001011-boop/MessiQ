@@ -11,6 +11,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getPaymentStatus } from "@/lib/mealResponses";
 import { toast } from "sonner";
 
 type ProfileData = {
@@ -26,6 +27,7 @@ type ProfileData = {
   hostel: string;
   room: string;
   subscription: string;
+  paymentStatus: "paid" | "unpaid";
 };
 
 const defaultProfile: ProfileData = {
@@ -41,6 +43,7 @@ const defaultProfile: ProfileData = {
   hostel: "",
   room: "",
   subscription: "Not set",
+  paymentStatus: "unpaid",
 };
 
 export default function ProfilePage() {
@@ -80,7 +83,7 @@ export default function ProfilePage() {
 
         const data = snap.data() as Partial<ProfileData>;
 
-        const loadedProfile = {
+        const loadedProfile: ProfileData = {
           ...defaultProfile,
           ...data,
           uid: user.uid,
@@ -89,6 +92,7 @@ export default function ProfilePage() {
           subscription: typeof data.subscription === "string" && data.subscription.trim()
             ? data.subscription
             : "Not set",
+          paymentStatus: getPaymentStatus(data.paymentStatus),
         };
         setProfile(loadedProfile);
         setSavedProfile(loadedProfile);
@@ -205,13 +209,15 @@ export default function ProfilePage() {
                 {profile.name || "Student"}
               </h1>
 
-              <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-sm">
-                {profile.subscription}
-              </span>
+              {profile.role !== "admin" && (
+                <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-sm">
+                  {profile.subscription}
+                </span>
+              )}
             </div>
 
             <p className="text-muted-foreground mt-2">
-              {profile.branch || "Student Profile"}
+              {profile.role === "admin" ? "Admin Profile" : profile.branch || "Student Profile"}
             </p>
           </div>
         </div>
@@ -222,6 +228,18 @@ export default function ProfilePage() {
         <h2 className="text-xl font-semibold mb-6">
           Personal Information
         </h2>
+
+        {profile.role === "student" && (
+          <div className="mb-6 flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Payment Status · admin-managed</p>
+              <p className="mt-1 font-semibold">{profile.paymentStatus === "paid" ? "Paid" : "Unpaid"}</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${profile.paymentStatus === "paid" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+              {profile.paymentStatus === "paid" ? "Paid" : "Not Paid"}
+            </span>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-5">
           <div>
@@ -262,95 +280,101 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div>
-            <label>Subscription</label>
-            <Input
-              name="subscription"
-              value={profile.subscription}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
-          </div>
+          {profile.role !== "admin" && (
+            <div>
+              <label>Subscription</label>
+              <Input
+                name="subscription"
+                value={profile.subscription}
+                onChange={handleChange}
+                disabled={!isEditing || isSaving}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Academic Details */}
-      <div className="rounded-xl border bg-card p-6 shadow-md">
-        <h2 className="text-xl font-semibold mb-6">
-          Academic Details
-        </h2>
+      {profile.role !== "admin" && (
+        <>
+          {/* Academic Details */}
+          <div className="rounded-xl border bg-card p-6 shadow-md">
+            <h2 className="text-xl font-semibold mb-6">
+              Academic Details
+            </h2>
 
-        <div className="grid md:grid-cols-2 gap-5">
-          <div>
-            <label>Roll Number</label>
-            <Input
-              name="roll"
-              value={profile.roll}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <label>Roll Number</label>
+                <Input
+                  name="roll"
+                  value={profile.roll}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
+
+              <div>
+                <label>Branch</label>
+                <Input
+                  name="branch"
+                  value={profile.branch}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
+
+              <div>
+                <label>Year</label>
+                <Input
+                  name="year"
+                  value={profile.year}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
+
+              <div>
+                <label>Section</label>
+                <Input
+                  name="section"
+                  value={profile.section}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label>Branch</label>
-            <Input
-              name="branch"
-              value={profile.branch}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
-          </div>
+          {/* Hostel Details */}
+          <div className="rounded-xl border bg-card p-6 shadow-md">
+            <h2 className="text-xl font-semibold mb-6">
+              Hostel Details
+            </h2>
 
-          <div>
-            <label>Year</label>
-            <Input
-              name="year"
-              value={profile.year}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
-          </div>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <label>Hostel</label>
+                <Input
+                  name="hostel"
+                  value={profile.hostel}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
 
-          <div>
-            <label>Section</label>
-            <Input
-              name="section"
-              value={profile.section}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
+              <div>
+                <label>Room Number</label>
+                <Input
+                  name="room"
+                  value={profile.room}
+                  onChange={handleChange}
+                  disabled={!isEditing || isSaving}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Hostel Details */}
-      <div className="rounded-xl border bg-card p-6 shadow-md">
-        <h2 className="text-xl font-semibold mb-6">
-          Hostel Details
-        </h2>
-
-        <div className="grid md:grid-cols-2 gap-5">
-          <div>
-            <label>Hostel</label>
-            <Input
-              name="hostel"
-              value={profile.hostel}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
-          </div>
-
-          <div>
-            <label>Room Number</label>
-            <Input
-              name="room"
-              value={profile.room}
-              onChange={handleChange}
-              disabled={!isEditing || isSaving}
-            />
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <div className="flex justify-end gap-4">
         <Button
