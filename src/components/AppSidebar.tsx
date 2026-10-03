@@ -28,6 +28,7 @@ import { auth, db } from "@/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { filterNavigationItems, type AppRole } from "@/lib/accessControl";
 
 const navItems = [
   {
@@ -74,18 +75,19 @@ const navItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<AppRole | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       unsubscribeProfile?.();
       unsubscribeProfile = undefined;
-      setIsAdmin(false);
+      setUserRole(null);
       if (user) {
         unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (profile) => {
           if (auth.currentUser?.uid === user.uid) {
-            setIsAdmin(profile.exists() && profile.data().role === "admin");
+            const role = profile.exists() ? profile.data().role : undefined;
+            setUserRole(role === "admin" || role === "student" ? role : null);
           }
         }, (error) => console.error("Failed to load navigation role:", error));
       }
@@ -97,7 +99,7 @@ export function AppSidebar() {
   }, []);
 
   const collapsed = state === "collapsed";
-  const visibleNavItems = navItems.filter((item) => item.url !== "/admin" || isAdmin);
+  const visibleNavItems = filterNavigationItems(navItems, userRole);
 
   return (
     <Sidebar collapsible="icon">

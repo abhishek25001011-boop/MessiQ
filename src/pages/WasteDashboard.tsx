@@ -34,8 +34,11 @@ export default function WasteDashboard() {
       ) : error ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive" role="alert">{error}</div>
       ) : records.length === 0 ? (
-        <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
-          No meal selections are recorded yet. Saved student choices will provide demand context here.
+        <div className="glass-card rounded-xl p-6" role="status">
+          <h2 className="font-display text-lg font-semibold">No waste data recorded yet</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Actual waste tracking requires verified meal quantities prepared, served, consumed, or discarded. Meal-selection data can provide planning context but is not a measurement of food waste.
+          </p>
         </div>
       ) : (
         <>

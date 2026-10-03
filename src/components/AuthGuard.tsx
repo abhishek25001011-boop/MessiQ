@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { doc, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
+import { hasRequiredRole, type AppRole } from "@/lib/accessControl";
 
 type AuthGuardProps = {
   children: React.ReactNode;
@@ -59,8 +60,16 @@ export function AuthGuard({
   return <>{children}</>;
 }
 
-export function AdminGuard({ children }: { children: React.ReactNode }) {
-  const [access, setAccess] = useState<"loading" | "admin" | "denied" | "signed-out">("loading");
+export function RoleGuard({
+  children,
+  requiredRole,
+  redirectTo,
+}: {
+  children: React.ReactNode;
+  requiredRole: AppRole;
+  redirectTo: string;
+}) {
+  const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signed-out">("loading");
 
   useEffect(() => {
     let unsubscribeRole: (() => void) | undefined;
@@ -78,12 +87,12 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         (userSnapshot) => {
           if (auth.currentUser?.uid !== user.uid) return;
           const role = userSnapshot.exists() ? userSnapshot.data().role : undefined;
-          setAccess(role === "admin" ? "admin" : "denied");
+          setAccess(hasRequiredRole(role, requiredRole) ? "allowed" : "denied");
         },
         (error) => {
           console.error("Failed to verify admin role:", error);
           setAccess("denied");
-          toast.error("Unable to verify admin access.");
+          toast.error(`Unable to verify ${requiredRole} access.`);
         },
       );
     });
@@ -92,12 +101,20 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       unsubscribeRole?.();
       unsubscribe();
     };
-  }, []);
+  }, [requiredRole]);
 
   if (access === "loading") {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking administrator access...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking account access...</div>;
   }
   if (access === "signed-out") return <Navigate to="/login" replace />;
-  if (access === "denied") return <Navigate to="/dashboard" replace />;
+  if (access === "denied") return <Navigate to={redirectTo} replace />;
   return <>{children}</>;
+}
+
+export function AdminGuard({ children }: { children: React.ReactNode }) {
+  return <RoleGuard requiredRole="admin" redirectTo="/dashboard">{children}</RoleGuard>;
+}
+
+export function StudentGuard({ children }: { children: React.ReactNode }) {
+  return <RoleGuard requiredRole="student" redirectTo="/admin">{children}</RoleGuard>;
 }

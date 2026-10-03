@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { auth, db } from "@/firebase";
+import { calculateMealParticipationPercentage } from "@/lib/adminMetrics";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   addDoc,
@@ -205,7 +206,7 @@ export default function AdminPanel() {
         const totalStudents = studentsSnap.size;
         const studentUids = new Set(studentsSnap.docs.map((studentDoc) => studentDoc.id));
         let todaysMealSelections = 0;
-        const uniqueParticipants = new Set<string>();
+        const validMealResponses: { uid: string; choice: string }[] = [];
         const mealCounts: AdminMetrics["mealCounts"] = {
           breakfast: 0,
           lunch: 0,
@@ -227,7 +228,7 @@ export default function AdminPanel() {
           if (choice !== "yes" && choice !== "custom" && choice !== "no") return;
 
           todaysMealSelections += 1;
-          uniqueParticipants.add(uid);
+          validMealResponses.push({ uid, choice });
           mealCounts[mealType] += 1;
           if (choice === "yes") selectionCounts.yes += 1;
           else if (choice === "custom") selectionCounts.custom += 1;
@@ -268,10 +269,10 @@ export default function AdminPanel() {
           }
         });
 
-        const mealParticipationPercentage =
-          totalStudents > 0
-            ? Math.round((uniqueParticipants.size / totalStudents) * 100)
-            : 0;
+        const mealParticipationPercentage = calculateMealParticipationPercentage(
+          totalStudents,
+          validMealResponses,
+        );
 
         const studentsByUid = new Map(studentRows.map((student) => [student.uid, student]));
         const mealsById = new Map(mealRows.map((meal) => [meal.id, meal]));
@@ -492,7 +493,7 @@ export default function AdminPanel() {
             <StatCard
               title="Meal Participation"
               value={`${metrics.mealParticipationPercentage}%`}
-              subtitle="Students who selected today"
+              subtitle="Students choosing Yes or Custom today"
               icon={Percent}
               gradient="cool"
             />

@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
-import { AdminGuard, AuthGuard } from "@/components/AuthGuard";
+import { AdminGuard, AuthGuard, StudentGuard } from "@/components/AuthGuard";
 
 import LoginPage from "@/pages/LoginPage";
 import Dashboard from "@/pages/Dashboard";
@@ -50,8 +50,8 @@ const App = () => (
             }
           >
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/meals" element={<MealSelection />} />
-            <Route path="/predictions" element={<AIPredictions />} />
+            <Route path="/meals" element={<StudentGuard><MealSelection /></StudentGuard>} />
+            <Route path="/predictions" element={<AdminGuard><AIPredictions /></AdminGuard>} />
             <Route
               path="/admin"
               element={
@@ -60,9 +60,9 @@ const App = () => (
                 </AdminGuard>
               }
             />
-            <Route path="/feedback" element={<FeedbackPage />} />
-            <Route path="/waste" element={<WasteDashboard />} />
-            <Route path="/revenue" element={<RevenuePage />} />
+            <Route path="/feedback" element={<StudentGuard><FeedbackPage /></StudentGuard>} />
+            <Route path="/waste" element={<AdminGuard><WasteDashboard /></AdminGuard>} />
+            <Route path="/revenue" element={<AdminGuard><RevenuePage /></AdminGuard>} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 

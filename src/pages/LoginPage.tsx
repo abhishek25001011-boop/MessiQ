@@ -65,6 +65,7 @@ export default function LoginPage() {
     try {
       if (isSignup) {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
+        authenticatedUserId = credential.user.uid;
         await setDoc(doc(db, "users", credential.user.uid), {
           uid: credential.user.uid,
           name: name.trim() || "Student",
@@ -72,6 +73,7 @@ export default function LoginPage() {
           role: "student",
           createdAt: serverTimestamp(),
         });
+        authenticatedUserId = undefined;
         navigate("/dashboard");
         return;
       }
@@ -110,7 +112,11 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Authentication request failed:", error);
       if (authenticatedUserId && auth.currentUser?.uid === authenticatedUserId) {
-        await rejectAuthenticatedLogin("We couldn't verify this account's role. Please try again.");
+        const message = isSignup
+          ? "Your account was created, but its profile could not be saved. You have been signed out; please try signing in again or contact support."
+          : "We couldn't verify this account's role. Please try again.";
+        await rejectAuthenticatedLogin(message);
+        authenticatedUserId = undefined;
       } else {
         setErrorMessage(getAuthErrorMessage(error));
       }

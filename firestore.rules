@@ -122,7 +122,9 @@ service cloud.firestore {
         || resource.data.uid == request.auth.uid
       ));
       allow list: if isAdmin() || (isStudent() && resource.data.uid == request.auth.uid);
-      allow create: if (isAdmin() || (isStudent() && request.resource.data.uid == request.auth.uid))
+      allow create: if request.auth != null
+        && isStudent()
+        && request.resource.data.uid == request.auth.uid
         && validFeedback(request.resource.data.uid, feedbackId)
         && request.resource.data.createdAt == request.time;
       allow update, delete: if isAdmin();

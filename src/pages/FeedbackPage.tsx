@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { auth, db } from "@/firebase";
+import { isFeedbackOwner } from "@/lib/accessControl";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -244,7 +245,7 @@ export default function FeedbackPage() {
 
   const handleSubmit = async () => {
     const userId = auth.currentUser?.uid;
-    if (!userId || userId !== uid || isStudent !== true) {
+    if (!isFeedbackOwner(userId, uid) || isStudent !== true) {
       toast.error("Please log in with a student account to submit feedback.");
       return;
     }

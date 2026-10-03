@@ -40,7 +40,7 @@ const defaultProfile: ProfileData = {
   section: "",
   hostel: "",
   room: "",
-  subscription: "Premium",
+  subscription: "Not set",
 };
 
 export default function ProfilePage() {
@@ -52,8 +52,13 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let requestId = 0;
+    let active = true;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const currentRequest = ++requestId;
       if (!user) {
+        setProfile(defaultProfile);
+        setSavedProfile(defaultProfile);
         setLoadError("You must be logged in to view your profile.");
         setIsLoading(false);
         return;
@@ -65,6 +70,7 @@ export default function ProfilePage() {
 
         const userRef = doc(db, "users", user.uid);
         const snap = await getDoc(userRef);
+        if (!active || currentRequest !== requestId || auth.currentUser?.uid !== user.uid) return;
 
         if (!snap.exists()) {
           setLoadError("Profile not found. Please contact support.");
@@ -80,19 +86,29 @@ export default function ProfilePage() {
           uid: user.uid,
           email: data.email || user.email || "",
           role: data.role === "student" || data.role === "admin" ? data.role : "Unknown",
+          subscription: typeof data.subscription === "string" && data.subscription.trim()
+            ? data.subscription
+            : "Not set",
         };
         setProfile(loadedProfile);
         setSavedProfile(loadedProfile);
       } catch (error) {
+        if (!active || currentRequest !== requestId || auth.currentUser?.uid !== user.uid) return;
         console.error("Failed to load the authenticated user's profile:", error);
         setLoadError("Failed to load profile. Please try again.");
         toast.error("Failed to load profile. Please try again.");
       } finally {
-        setIsLoading(false);
+        if (active && currentRequest === requestId && auth.currentUser?.uid === user.uid) {
+          setIsLoading(false);
+        }
       }
     });
 
-    return unsubscribe;
+    return () => {
+      active = false;
+      requestId += 1;
+      unsubscribe();
+    };
   }, []);
 
   const handleChange = (
